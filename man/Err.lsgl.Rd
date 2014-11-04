@@ -51,7 +51,7 @@ Err(fit, X1)
 Err(fit, X2, Y2)
 
 #### Do cross validation
-fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
+fit.cv <- lsgl.cv(X1, Y1, alpha = 1, fold = 2, lambda = lambda, intercept = FALSE)
 
 ## Cross validation errors (estimated expected generalization error)
 Err(fit.cv)

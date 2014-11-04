@@ -46,7 +46,7 @@
 #'
 #' ## Simulate from Y=XB+E, the dimension of Y is N x K, X is N x p, B is p x K 
 #' 
-#' N <- 100 #number of samples
+#' N <- 50 #number of samples
 #' p <- 50 #number of features
 #' K <- 25  #number of groups
 #' 
@@ -56,7 +56,7 @@
 #' 
 #' ##Do cross validation
 #' lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 25L, lambda.min = 0.5, intercept = FALSE)
-#' fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
+#' fit.cv <- lsgl.cv(X1, Y1, alpha = 1, fold = 2, lambda = lambda, intercept = FALSE)
 #' 
 #' ## Cross validation errors (estimated expected generalization error)
 #' Err(fit.cv)

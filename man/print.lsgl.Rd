@@ -34,7 +34,7 @@ fit <-lsgl(X,Y, alpha=1, lambda = lambda, intercept=FALSE)
 fit
 
 ## Cross validation
-fit.cv <- lsgl.cv(X, Y, alpha = 1, lambda = lambda, intercept = FALSE)
+fit.cv <- lsgl.cv(X, Y, alpha = 1, fold = 2, lambda = lambda, intercept = FALSE)
 
 # Print some information
 fit.cv

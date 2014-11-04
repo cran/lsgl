@@ -78,7 +78,7 @@ Y1 <-X1\%*\%B+matrix(rnorm(N*K,0,1),N,K)
 
 ##Do cross validation
 lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 25L, lambda.min = 0.5, intercept = FALSE)
-fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
+fit.cv <- lsgl.cv(X1, Y1, alpha = 1, fold = 2, lambda = lambda, intercept = FALSE)
 
 ## Cross validation errors (estimated expected generalization error)
 Err(fit.cv)
