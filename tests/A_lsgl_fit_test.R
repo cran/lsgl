@@ -21,6 +21,10 @@
 
 library(lsgl)
 
+# warnings = errors
+options(warn=2)
+
+
 set.seed(100) #  ensures consistency of tests
 
 ## Simulate from Y=XB+E, the dimension of Y is N x K, X is N x p, B is p x K 
@@ -40,3 +44,12 @@ fit <-lsgl(X,Y, alpha=1, lambda = lambda, intercept=FALSE)
 
 ## ||B - \beta||_F
 if(min(sapply(fit$beta, function(beta) sum((B - beta)^2))) > 11) stop()
+
+
+
+## Test single fit i.e. K = 1
+y <- Y[,1]
+
+lambda<-lsgl.lambda(X,y, alpha=1, lambda.min=.5, intercept=FALSE)
+fit <-lsgl(X, y, alpha=1, lambda = lambda, intercept=FALSE)
+res <- predict(fit, X)

@@ -33,7 +33,8 @@
 #' 
 #' @param x design matrix, matrix of size \eqn{N \times p}.
 #' @param y response matrix, matrix of size \eqn{N \times K}.
-#' @param intercept should the model include intercept parameters
+#' @param intercept should the model include intercept parameters.
+#' @param weights sample weights, vector of size \eqn{N \times K}.
 #' @param grouping grouping of features, a factor or vector of length \eqn{p}. 
 #' Each element of the factor/vector specifying the group of the feature. 
 #' @param groupWeights the group weights, a vector of length \eqn{m} (the number of groups). 
@@ -82,11 +83,13 @@
 #' # In this cases this is simply the loss function
 #' 1/(sqrt(N)*K)*sqrt(fit$loss)
 #'
-#' @useDynLib lsgl .registration=TRUE
+#' @useDynLib lsgl, .registration=TRUE
+#' @importFrom utils packageVersion
 #' @export
 #' @import Matrix
 #' @import sglOptim
 lsgl <- function(x, y, intercept = TRUE, 
+		weights = NULL,
 		grouping = factor(1:ncol(x)), 
 		groupWeights = c(sqrt(ncol(y)*table(grouping))), 
 		parameterWeights =  matrix(1, nrow = ncol(y), ncol = ncol(x)), 
@@ -95,8 +98,18 @@ lsgl <- function(x, y, intercept = TRUE,
 	# Get call
 	cl <- match.call()
 	
+	if(!is.matrix(y)) {
+		y <- as.matrix(y)
+	}
+	
 	if(nrow(x) != nrow(y)) {
 		stop("x and y must have the same number of rows")
+	}
+	
+	if(!is.null(weights)) {
+		if(!all(dim(y) == dim(weights))) {
+			stop("w and y must have the same dimensions")
+		}
 	}
 	
 	# cast
@@ -112,14 +125,47 @@ lsgl <- function(x, y, intercept = TRUE,
 	
 	# create data
 	group.names <- if(is.null(colnames(y))) 1:ncol(y) else colnames(y)
-	data <- create.sgldata(x, y, group.names = group.names)
+	data <- create.sgldata(x, y, weights = weights, group.names = group.names)
 	
-	# call SglOptimizer function
-	if(data$sparseX) {
-		res <- sgl_fit("lsgl_sparse", "lsgl", data, grouping, groupWeights, parameterWeights, alpha, lambda, return = 1:length(lambda), algorithm.config)
-	} else {
-		res <- sgl_fit("lsgl_dense", "lsgl", data, grouping, groupWeights, parameterWeights, alpha, lambda, return = 1:length(lambda), algorithm.config)
+	# Print info
+	if(algorithm.config$verbose) {
+		
+		cat("\nRunning lsgl ")
+		if(data$sparseX & data$sparseY) {
+			cat("(sparse design and response matrices)")
+		}
+		if(data$sparseX & !data$sparseY) {
+			cat("(sparse design matrix)")
+		}
+		if(!data$sparseX & data$sparseY) {
+			cat("(sparse response matrix)")
+		}
+		
+		cat("\n\n")
+		
+		print(data.frame('Samples: ' = print_with_metric_prefix(nrow(x)), 
+						'Features: ' = print_with_metric_prefix(data$n.covariate), 
+						'Models: ' = print_with_metric_prefix(ncol(y)), 
+						'Groups: ' = print_with_metric_prefix(length(unique(grouping))), 
+						'Parameters: ' = print_with_metric_prefix(length(parameterWeights)),
+						check.names = FALSE), 
+				row.names = FALSE, digits = 2, right = TRUE)
+		cat("\n")
 	}
+
+	# call SglOptimizer function
+	if(!is.null(weights)) {
+			obj <- "lsgl_w_"
+	} else {
+			obj <- "lsgl_"
+	}
+		
+	callsym <- paste(obj, if(data$sparseX) "xs_" else "xd_", if(data$sparseY) "ys" else "yd", sep = "")
+	
+	res <- sgl_fit(callsym, "lsgl", data, grouping, groupWeights, parameterWeights, alpha, lambda, return = 1:length(lambda), algorithm.config)
+
+	# Add weights
+	res$weights <- weights
 	
 	# Add true response
 	res$Y.true <- y
@@ -142,7 +188,8 @@ lsgl <- function(x, y, intercept = TRUE,
 #'
 #' @param x design matrix, matrix of size \eqn{N \times p}.
 #' @param y response matrix, matrix of size \eqn{N \times K}.
-#' @param intercept should the model include intercept parameters
+#' @param intercept should the model include intercept parameters.
+#' @param weights sample weights, vector of size \eqn{N \times K}.
 #' @param grouping grouping of features, a factor or vector of length \eqn{p}. Each element of the factor/vector specifying the group of the feature. 
 #' @param groupWeights the group weights, a vector of length \eqn{m} (the number of groups). 
 #' @param parameterWeights a matrix of size \eqn{K \times p}. 
@@ -152,21 +199,37 @@ lsgl <- function(x, y, intercept = TRUE,
 #' @param algorithm.config the algorithm configuration to be used. 
 #' @return a vector of length \code{d} containing the compute lambda sequence.
 #' @author Martin Vincent
-#' @useDynLib lsgl .registration=TRUE
+#' @useDynLib lsgl, .registration=TRUE
 #' @export
 lsgl.lambda <- function(x, y, intercept = TRUE, 
+		weights = NULL,
 		grouping = factor(1:ncol(x)), 
 		groupWeights = c(sqrt(ncol(y)*table(grouping))), 
 		parameterWeights =  matrix(1, nrow = ncol(y), ncol = ncol(x)), 
 		alpha = 1, d = 100L, lambda.min, algorithm.config = lsgl.standard.config) 
 {
+	
+	if(!is.matrix(y)) {
+		y <- as.matrix(y)
+	}
+
 	if(nrow(x) != nrow(y)) {
 		stop("x and y must have the same number of rows")
+	}
+	
+	if(!is.null(weights)) {
+		if(!all(dim(y) == dim(weights))) {
+			stop("w and y must have the same dimensions")
+		}
 	}
 	
 	# cast
 	grouping <- factor(grouping)
 	
+	#FIXME kron intercept
+	if(intercept & is(x, "kron")) {
+		stop("intercept not yet implemented for kron")
+	}
 	# add intercept
 	if(intercept) {
 		x <- cBind(Intercept = rep(1, nrow(x)), x)
@@ -177,14 +240,33 @@ lsgl.lambda <- function(x, y, intercept = TRUE,
 	
 	# create data
 	group.names <- if(is.null(colnames(y))) 1:ncol(y) else colnames(y)
-	data <- create.sgldata(x, y, group.names = group.names)
+	data <- create.sgldata(x, y, weights = weights, group.names = group.names)
 	
-	# call SglOptimizer function
-	if(data$sparseX) {
-		lambda <- sgl_lambda_sequence("lsgl_sparse", "lsgl", data, grouping, groupWeights, parameterWeights, alpha = alpha, d = d, lambda.min, algorithm.config)
+	# call SglOptim function
+	if(is(x, "kron")) {
+		
+		if(length(x) == 2) {
+			callsym <- "lsgl_kdx"
+		} else if(length(x) == 3) {
+			callsym <- "lsgl_ktx"
+		} else {
+			stop("unsupported kron")
+		}
+		
 	} else {
-		lambda <- sgl_lambda_sequence("lsgl_dense", "lsgl", data, grouping, groupWeights, parameterWeights, alpha = alpha, d = d, lambda.min, algorithm.config)
+
+		if(!is.null(weights)) {
+			obj <- "lsgl_w_"
+		} else {
+			obj <- "lsgl_"
+		}
+			
+		callsym <- paste(obj, if(data$sparseX) "xs_" else "xd_", if(data$sparseY) "ys" else "yd", sep = "")
+		
 	}
+	
+	lambda <- sgl_lambda_sequence(callsym, "lsgl", data, grouping, groupWeights, parameterWeights, alpha = alpha, d = d, lambda.min, algorithm.config)		
+	
 	
 	return(lambda)
 }

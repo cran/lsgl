@@ -22,16 +22,26 @@
 #' @title Compute error rates 
 #' 
 #' @description
-#' Compute and return the error
-#' \deqn{\frac{1}{NK}\|Y - X\hat B\|_F}
-#' for each model.
+#' Compute and return an error for each model. The error may be spicifed in the \code{loss} argument.
 #' 
-#' @param object a lsgl object
-#' @param data a design matrix (the \eqn{X} matrix)
-#' @param response redirected to \code{y}
-#' @param y a matrix of the true responses (the \eqn{Y} matrix)
-#' @param ... ignored
-#' @return a vector of error rates
+#' The root-mean-square error (RMSE) is
+#' \deqn{\frac{1}{K}\sum_{i = 1}^K \sqrt{\frac{1}{N}\sum_{j=1}^N Y_{ji}-(X\hat \beta)_{ji}}}
+#' RMSE is the default error.
+#' 
+#' The objective value error (OVE) is
+#' \deqn{\|Y - X\hat \beta\|_F}
+#' 
+#' The scaled objective value error (SOVE) is
+#' \deqn{\frac{1}{NK}\|Y - X\hat \beta\|_F}
+#' 
+#' @param object a lsgl object.
+#' @param data a design matrix (the \eqn{X} matrix).
+#' @param response redirected to \code{y}.
+#' @param y a matrix of the true responses (the \eqn{Y} matrix).
+#' @param loss the loss (error) function. Either a function taking two arguments or 
+#' one of the following character strings \code{RMSE}, \code{OVE} or \code{SOVE}.
+#' @param ... ignored.
+#' @return a vector of errors.
 #' 
 #' @author Martin Vincent
 #' @examples
@@ -40,10 +50,11 @@
 #'
 #' ## Simulate from Y=XB+E, the dimension of Y is N x K, X is N x p, B is p x K 
 #' 
-#' N <- 50 #number of samples
+#' N <- 100 #number of samples
 #' p <- 50 #number of features
-#' K <- 25  #number of groups
+#' K <- 15  #number of groups
 #' 
+#' # simulate beta matrix and X matrix
 #' B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=K) 
 #' X1<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
 #' Y1 <-X1%*%B+matrix(rnorm(N*K,0,1),N,K)
@@ -52,7 +63,7 @@
 #' Y2 <-X2%*%B+matrix(rnorm(N*K,0,1),N,K)
 #' 
 #' #### Fit models using X1
-#' lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 25L, lambda.min = 0.5, intercept = FALSE)
+#' lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 25L, lambda.min = 5, intercept = FALSE)
 #' fit <- lsgl(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
 #' 
 #' ## Training errors:
@@ -62,17 +73,28 @@
 #' Err(fit, X2, Y2)
 #' 
 #' #### Do cross validation
-#' fit.cv <- lsgl.cv(X1, Y1, alpha = 1, fold = 2, lambda = lambda, intercept = FALSE)
+#' fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
 #' 
 #' ## Cross validation errors (estimated expected generalization error)
 #' Err(fit.cv)
-#' 
+#'
+#' ## Cross validation errors using objective value error measures
+#' Err(fit.cv, loss = "OVE")
+#'
 #' @method Err lsgl
-#' @S3method Err lsgl
 #' @import sglOptim
 #' @export
-Err.lsgl <- function(object, data = NULL, response = object$Y.true, y = response, ... ) {
-	return(compute_error(object, data = data, response.name = "Yhat", response = y, loss = function(x,y) 1/length(x)*sqrt(sum((x - y)^2))))
+Err.lsgl <- function(object, data = NULL, response = object$Y.true, y = response, loss = "RMSE", ... ) {
+	
+	if(!is.function(loss)) {
+		loss <- switch(loss, 
+			RMSE = function(x,y) mean(sqrt(colMeans((x - y)^2))), 
+			OVE = function(x,y) sqrt(sum((x - y)^2)),
+			SOVE = function(x,y) 1/length(x)*sqrt(sum((x - y)^2)),
+			stop("Unknown loss"))
+	}
+
+	return(compute_error(object, data = data, response.name = "Yhat", response = y, loss = loss))
 }
 
 #' @title Nonzero features
@@ -110,11 +132,17 @@ Err.lsgl <- function(object, data = NULL, response = object$Y.true, y = response
 #'
 #' @author Martin Vincent
 #' @method features lsgl
-#' @S3method features lsgl
 #' @import sglOptim
 #' @export
 features.lsgl <- function(object, ...) {
+	
 	class(object) <- "sgl" # Use std function
+
+	if(!is.null(object$beta)) {
+		# sgl uses t(beta)
+		object$beta <- lapply(object$beta, t)
+	}
+	
 	return(features(object))
 }
 
@@ -153,11 +181,17 @@ features.lsgl <- function(object, ...) {
 #'
 #' @author Martin Vincent
 #' @method parameters lsgl
-#' @S3method parameters lsgl
 #' @import sglOptim
 #' @export
 parameters.lsgl <- function(object, ...) {
+	
 	class(object) <- "sgl" # Use std function
+	
+	if(!is.null(object$beta)) {
+		# sgl uses t(beta)
+		object$beta <- lapply(object$beta, t)
+	}
+	
 	return(parameters(object))
 }
 
@@ -190,7 +224,6 @@ parameters.lsgl <- function(object, ...) {
 #'
 #' @author Martin Vincent
 #' @method nmod lsgl
-#' @S3method nmod lsgl
 #' @import sglOptim
 #' @export
 nmod.lsgl <- function(object, ...) {
@@ -210,11 +243,11 @@ nmod.lsgl <- function(object, ...) {
 #' 
 #' @author Martin Vincent
 #' @method models lsgl
-#' @S3method models lsgl
 #' @import sglOptim
 #' @export
 models.lsgl <- function(object, index = 1:nmod(object), ...) {
 	class(object) <- "sgl" # Use std function
+	
 	return(models(object, ...))
 }
 
@@ -248,11 +281,18 @@ models.lsgl <- function(object, index = 1:nmod(object), ...) {
 #'
 #' @author Martin Vincent
 #' @method coef lsgl
-#' @S3method coef lsgl
 #' @import sglOptim
+#' @importFrom stats coef
 #' @export
 coef.lsgl <- function(object, index = 1:nmod(object), ...) {
+	
 	class(object) <- "sgl" # Use std function
+	
+	if(!is.null(object$beta)) {
+		# sgl uses t(beta)
+		object$beta <- lapply(object$beta, t)
+	}
+	
 	return(coef(object, index = index, ...))
 }
 
@@ -270,38 +310,31 @@ coef.lsgl <- function(object, index = 1:nmod(object), ...) {
 #'
 #' ## Simulate from Y=XB+E, the dimension of Y is N x K, X is N x p, B is p x K 
 #' 
-#' N <- 50 #number of samples
-#' p <- 50 #number of features
-#' K <- 25  #number of groups
+#' N <- 100 #number of samples
+#' p <- 25 #number of features
+#' K <- 15  #number of groups
 #' 
 #' B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=K) 
 #' 
 #' X<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
 #' Y<-X%*%B+matrix(rnorm(N*K,0,1),N,K)	
 #' 
-#' lambda<-lsgl.lambda(X,Y, alpha=1, d = 25, lambda.min=.5, intercept=FALSE)
+#' lambda<-lsgl.lambda(X,Y, alpha=1, d = 25, lambda.min= 5, intercept=FALSE)
 #' fit <-lsgl(X,Y, alpha=1, lambda = lambda, intercept=FALSE)
 #'
 #' # Print some information about the estimated models
 #' fit
 #' 
 #' ## Cross validation
-#' fit.cv <- lsgl.cv(X, Y, alpha = 1, fold = 2, lambda = lambda, intercept = FALSE)
+#' fit.cv <- lsgl.cv(X, Y, alpha = 1, lambda = lambda, intercept = FALSE)
 #' 
 #'# Print some information
 #' fit.cv
 #' 
 #' @method print lsgl
-#' @S3method print lsgl
 #' @author Martin Vincent
 #' @import sglOptim
 #' @export
 print.lsgl <- function(x, ...) {
-	
-	if(!is.null(x$beta)) {
-		# sgl uses t(beta)
-		x$beta <- lapply(x$beta, t)
-	}
-	
 	sgl_print(x)
 }

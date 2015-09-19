@@ -35,6 +35,7 @@
 #' @param stepsize_opt_penalized_initial_t initial step-size.
 #' @param stepsize_opt_penalized_a step-size optimization parameter.
 #' @param stepsize_opt_penalized_b step-size optimization parameter.
+#' @param inner_loop_convergence_limit inner loop convergence limit.
 #' @param verbose If \code{TRUE} some information, regarding the status of the algorithm, will be printed in the R terminal.
 #' @return A configuration.
 #' @examples
@@ -72,6 +73,7 @@ lsgl.algorithm.config <- function(tolerance_penalized_main_equation_loop = 1e-10
 		stepsize_opt_penalized_initial_t = 1,
 		stepsize_opt_penalized_a = 0.1, 
 		stepsize_opt_penalized_b = 0.1, 
+		inner_loop_convergence_limit = 1e5,
 		verbose = TRUE) {
 	
 	config <- list()
@@ -94,6 +96,8 @@ lsgl.algorithm.config <- function(tolerance_penalized_main_equation_loop = 1e-10
 	config$stepsize_opt_penalized_a <- stepsize_opt_penalized_a
 	config$stepsize_opt_penalized_b <- stepsize_opt_penalized_b
 	
+	config$inner_loop_convergence_limit <- as.integer(inner_loop_convergence_limit)
+		
 	config$verbose <- verbose
 	
 	return(config)
@@ -106,3 +110,13 @@ lsgl.algorithm.config <- function(tolerance_penalized_main_equation_loop = 1e-10
 #' @author Martin Vicnet
 #' @export
 lsgl.standard.config <- lsgl.algorithm.config();
+
+#' Featch information about the C side configuration of the package
+#' @return list
+#' 
+#' @author Martin Vicnet
+#' @useDynLib lsgl r_pkg_c_config
+#' @export
+lsgl.c.config <- function() {
+	.Call("r_pkg_c_config")
+}

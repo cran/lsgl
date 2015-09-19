@@ -21,6 +21,9 @@
 
 library(lsgl)
 
+# warnings = errors
+options(warn=2)
+
 set.seed(100) # This may be removed, it ensures consistency of the daily tests
 
 ## Simulate from Y=XB+E, the dimension of Y is N x K, X is N x p, B is p x K 
@@ -38,4 +41,12 @@ lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 25, lambda.min = 0.5, intercept = F
 fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE, max.threads = 1)
 
 ## Cross validation errors (estimated expected generalization error)
-if(min(Err(fit.cv)) > 0.05) stop()
+if(min(Err(fit.cv, loss = "SOVE")) > 0.05) stop()
+
+
+## Test single fit i.e. K = 1
+y <- Y1[,1]
+
+lambda <- lsgl.lambda(X1, y, alpha = 1, d = 25, lambda.min = 0.5, intercept = FALSE)
+fit.cv <- lsgl.cv(X1, y, alpha = 1, lambda = lambda, intercept = FALSE, max.threads = 1)
+

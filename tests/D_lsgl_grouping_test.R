@@ -1,6 +1,6 @@
 #
 #     Description of this R script:
-#     R test for linear multiple output using sparse group lasso routines.
+#     R tests for linear multiple output sparse group lasso routines.
 #
 #     Intended for use with R.
 #     Copyright (C) 2014 Martin Vincent
@@ -24,28 +24,37 @@ library(lsgl)
 # warnings = errors
 options(warn=2)
 
-set.seed(100) # This may be removed, it ensures consistency of the daily tests
+set.seed(100) #  ensures consistency of tests
 
 ## Simulate from Y=XB+E, the dimension of Y is N x K, X is N x p, B is p x K 
 
-N <- 50 #number of samples
+N <- 25 #number of samples
 p <- 25 #number of features
 K <- 10  #number of groups
 
 B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=K) 
-X1<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
-Y1 <-X1%*%B+matrix(rnorm(N*K,0,1),N,K)
 
-##Do cross validation
-lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 25, lambda.min = 0.5, intercept = FALSE)
+X<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
+Y<-X%*%B+matrix(rnorm(N*K,0,1),N,K)	
 
-if(sgl.c.config()$omp.supported) {
-	threads = 2L
-} else {
-	threads = 1L
-}
+grouping <- rep(LETTERS[1:5],5)
 
-fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE, max.threads = threads)
+lambda<-lsgl.lambda(X,Y, grouping = grouping, alpha=0, lambda.min=0.1, intercept=FALSE)
 
-## Cross validation errors (estimated expected generalization error)
-if(min(Err(fit.cv, loss = "SOVE")) > 0.05) stop()
+fit <-lsgl(X,Y, grouping = grouping, alpha=0, lambda = lambda, intercept=FALSE)
+
+if(min(Err(fit, X)) > 1) stop()
+
+tmp <- which(rowSums(abs(fit$beta[[2]])) != 0)
+if(! all((tmp[1]+5*1:4) %in% tmp)) stop()
+
+## Test single fit i.e. K = 1
+y <- Y[,1]
+
+lambda<-lsgl.lambda(X,y, grouping = grouping,alpha=0, lambda.min=.5, intercept=FALSE)
+fit <-lsgl(X, y, grouping = grouping, alpha=0, lambda = lambda, intercept=FALSE)
+res <- predict(fit, X)
+
+tmp <- which(rowSums(abs(fit$beta[[2]])) != 0)
+if(! all((tmp[1]+5*1:4) %in% tmp)) stop()
+

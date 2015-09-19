@@ -62,35 +62,55 @@
 #'
 #' @author Martin Vincent
 #' @method predict lsgl
-#' @S3method predict lsgl
+#' @importFrom methods is
+#' @importFrom methods as
 #' @export
-#' @useDynLib lsgl .registration=TRUE
+#' @useDynLib lsgl, .registration=TRUE
 predict.lsgl <- function(object, x, sparse.data = is(x, "sparseMatrix"), ...) 
 {
 	# Get call
 	cl <- match.call()
+	
+	if(is.null(object$beta)) stop("No models found -- missing beta")
 	
 	if(object$intercept){
 		# add intercept
 		x <- cBind(Intercept = rep(1, nrow(x)), x)
 	}	
 	
+	#Check dimension of x
+	if(dim(object$beta[[1]])[1] != ncol(x)) stop("x has wrong dimension")
+	
 	object$beta <- lapply(object$beta, t)
 	
 	data <- list()
+	data$sparseX <- FALSE
 	
-	if(sparse.data) {
+	if(is(x, "kron")) {
 		
-		x <- as(x, "CsparseMatrix")
-		data$X <- list(dim(x), x@p, x@i, x@x)
+		if(length(x) == 2) {
+			callsym <- "lsgl_kdx"
+		} else if(length(x) == 3) {
+			callsym <- "lsgl_ktx"
+		} else {
+			stop("unsupported kron")
+		}
 		
-		res <- sgl_predict("lsgl_sparse", "lsgl", object, data)
+		data$X <- x
+		res <- sgl_predict(callsym, "lsgl", object, data)
+				
+	} else if(sparse.data) {
+		
+		data$X <- as(x, "CsparseMatrix")
+		data$sparseX <- TRUE
+		
+		res <- sgl_predict("lsgl_xs_yd", "lsgl", object, data)
 		
 	} else {
 		
 		data$X <- as.matrix(x)
 		
-		res <- sgl_predict("lsgl_dense", "lsgl", object, data)
+		res <- sgl_predict("lsgl_xd_yd", "lsgl", object, data)
 		
 	}
 	
