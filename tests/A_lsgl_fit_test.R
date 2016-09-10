@@ -27,24 +27,23 @@ options(warn=2)
 
 set.seed(100) #  ensures consistency of tests
 
-## Simulate from Y=XB+E, the dimension of Y is N x K, X is N x p, B is p x K 
- 
+## Simulate from Y=XB+E, the dimension of Y is N x K, X is N x p, B is p x K
+
 N <- 50 #number of samples
-p <- 50 #number of features
+p <- 40 #number of features
 K <- 25  #number of groups
- 
-B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=K) 
- 
+
+B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=K)
+
 X<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
-Y<-X%*%B+matrix(rnorm(N*K,0,1),N,K)	
+Y<-X%*%B+matrix(rnorm(N*K,0,1),N,K)
 
 lambda<-lsgl.lambda(X,Y, alpha=1, lambda.min=.5, intercept=FALSE)
- 
+
 fit <-lsgl(X,Y, alpha=1, lambda = lambda, intercept=FALSE)
 
 ## ||B - \beta||_F
 if(min(sapply(fit$beta, function(beta) sum((B - beta)^2))) > 11) stop()
-
 
 
 ## Test single fit i.e. K = 1
@@ -53,3 +52,29 @@ y <- Y[,1]
 lambda<-lsgl.lambda(X,y, alpha=1, lambda.min=.5, intercept=FALSE)
 fit <-lsgl(X, y, alpha=1, lambda = lambda, intercept=FALSE)
 res <- predict(fit, X)
+
+
+### Navigation tests
+print(res)
+print(fit)
+features_stat(fit)
+parameters_stat(fit)
+
+### Test for errors if X or Y contains NA
+Xna <- X
+Xna[1,1] <- NA
+
+res <- try(lambda<-lsgl.lambda(Xna, Y, alpha=1, lambda.min=.5, intercept=FALSE), silent = TRUE)
+if(class(res) != "try-error") stop()
+
+res <- try(fit <-lsgl(Xna, Y, alpha=1, lambda = lambda, intercept=FALSE), silent = TRUE)
+if(class(res) != "try-error") stop()
+
+Yna <- Y
+Yna[1,1] <- NA
+
+res <- try(lambda<-lsgl.lambda(X, Yna, alpha=1, lambda.min=.5, intercept=FALSE), silent = TRUE)
+if(class(res) != "try-error") stop()
+
+res <- try(fit <-lsgl(X, Yna, alpha=1, lambda = lambda, intercept=FALSE), silent = TRUE)
+if(class(res) != "try-error") stop()

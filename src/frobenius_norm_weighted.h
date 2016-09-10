@@ -29,6 +29,7 @@ public:
 
 	const sgl::natural n_samples;
 	const sgl::natural n_responses;
+	const sgl::natural n_variables; // number of parameters
 
 private:
 
@@ -50,6 +51,7 @@ public:
 	FrobeniusLossWeighted()
 			: 	n_samples(0),
 				n_responses(0),
+				n_variables(n_responses),
 				Y(sgl::null_matrix),
 				W(sgl::null_matrix),
 				lp(n_samples, n_responses)	{
@@ -57,7 +59,8 @@ public:
 
 	FrobeniusLossWeighted(data_type const& data)
 			: 	n_samples(data.get_A().n_samples),
-				n_responses(data.get_B().n_groups),
+				n_responses(data.get_B().n_responses),
+				n_variables(n_responses),
 				Y(data.get_B().response),
 				W(data.get_C().data),
 				lp(n_samples, n_responses) {

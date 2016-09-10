@@ -38,33 +38,14 @@ Y1 <-X1%*%B+matrix(rnorm(N*K,0,1),N,K)
 
 ##Do cross validation
 lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 25, lambda.min = 0.5, intercept = FALSE)
-fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE, max.threads = 1)
 
-## Cross validation errors (estimated expected generalization error)
-if(min(Err(fit.cv, loss = "SOVE")) > 0.05) stop()
+train <- replicate(2, 1:N, simplify = FALSE)
+test <- list(1:20, 21:N)
 
-
-## Test single fit i.e. K = 1
-y <- Y1[,1]
-
-lambda <- lsgl.lambda(X1, y, alpha = 1, d = 25, lambda.min = 0.5, intercept = FALSE)
-fit.cv <- lsgl.cv(X1, y, alpha = 1, lambda = lambda, intercept = FALSE, max.threads = 1)
+fit.sub <- lsgl.subsampling(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE, train = train, test = test, max.threads = 2)
 
 ## Navigation tests
-Err(fit.cv)
-features_stat(fit.cv)
-parameters_stat(fit.cv)
-best_model(fit.cv)
-
-### Test for errors if X or Y contains NA
-Xna <- X1
-Xna[1,1] <- NA
-
-res <- try(fit.cv <- lsgl.cv(Xna, Y1, alpha = 1, lambda = lambda, intercept = FALSE, max.threads = 1), silent = TRUE)
-if(class(res) != "try-error") stop()
-
-Yna <- Y1
-Yna[1,1] <- NA
-
-res <- try(fit.cv <- lsgl.cv(X1, Yna, alpha = 1, lambda = lambda, intercept = FALSE, max.threads = 1), silent = TRUE)
-if(class(res) != "try-error") stop()
+Err(fit.sub)
+features_stat(fit.sub)
+parameters_stat(fit.sub)
+best_model(fit.sub)

@@ -22,7 +22,7 @@ SEXP pkg_c_config() {
 
 	//profiling
 	bool timing = false;
-#ifdef SGL_TIMING
+#ifdef DO_TIMING
 	timing = true;
 #endif
 
@@ -52,6 +52,7 @@ SEXP pkg_c_config() {
 
 	rList res;
 	res.attach(rObject(debug_on), "debugging");
+	res.attach(rObject(timing), "timing");
 	res.attach(rObject(omp_supp), "omp.supported");
 	res.attach(rObject(runtime_checks), "runtime.checks");
 	res.attach(rObject(dim_checks), "dim.checks");

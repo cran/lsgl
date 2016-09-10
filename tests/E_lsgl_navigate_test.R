@@ -27,16 +27,16 @@ options(warn=2)
 
 set.seed(100) #  ensures consistency of tests
 
-## Simulate from Y=XB+E, the dimension of Y is N x K, X is N x p, B is p x K 
+## Simulate from Y=XB+E, the dimension of Y is N x K, X is N x p, B is p x K
 
 N <- 50 #number of samples
 p <- 50 #number of features
 K <- 25  #number of groups
 
-B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=K) 
+B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=K)
 
 X<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
-Y<-X%*%B+matrix(rnorm(N*K,0,1),N,K)	
+Y<-X%*%B+matrix(rnorm(N*K,0,1),N,K)
 
 lambda<-lsgl.lambda(X,Y, alpha=1, lambda.min=.5, intercept=FALSE)
 
@@ -47,9 +47,11 @@ fit
 
 # Test features
 features(fit)
+features_stat(fit)
 
 # parameters
 parameters(fit)
+parameters_stat(fit)
 
 nmod(fit)
 

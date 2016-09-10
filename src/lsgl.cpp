@@ -37,8 +37,15 @@
 //Exception handling
 #define SGL_CATCH_EXCEPTIONS
 
+// print information abt convergence
+//#define SGL_DEBUG_INFO_QUADRATIC
+
 //Should the timers be activated (only needed for profiling the code)
-//#define SGL_TIMING
+//#define DO_TIMING
+
+//Show entering and leving selected functions
+//#define FUNC_ENTER
+
 
 //Sgl optimizer
 #include <sgl.h>
@@ -47,8 +54,6 @@
 // Objectives
 #include "frobenius_norm.h"
 #include "frobenius_norm_weighted.h"
-
-//TODO all of the weighted modules
 
 /**********************************
  *
@@ -183,7 +188,7 @@ static const R_CallMethodDef sglCallMethods[] = {
 		SGL_SUBSAMPLING(lsgl_xd_yd), SGL_SUBSAMPLING(lsgl_xs_yd),
 		SGL_SUBSAMPLING(lsgl_xd_ys), SGL_SUBSAMPLING(lsgl_xs_ys),
 		SGL_SUBSAMPLING(lsgl_w_xd_yd),
-		NULL};
+		{NULL} };
 
 extern "C" {
 	void R_init_lsgl(DllInfo *info);

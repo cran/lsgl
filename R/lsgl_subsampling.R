@@ -19,9 +19,9 @@
 #     along with this program.  If not, see <http://www.gnu.org/licenses/>
 #
 
-#' @title Cross Validation
+#' @title Subsampling
 #' @description
-#' Linear multiple output cross validation using multiple possessors
+#' Linear multiple output subsampling using multiple possessors
 #'
 #' @param x design matrix, matrix of size \eqn{N \times p}.
 #' @param y response matrix, matrix of size \eqn{N \times K}.
@@ -32,15 +32,18 @@
 #' @param parameterWeights a matrix of size \eqn{K \times p}.
 #' @param alpha the \eqn{\alpha} value 0 for group lasso, 1 for lasso, between 0 and 1 gives a sparse group lasso penalty.
 #' @param lambda the lambda sequence for the regularization path.
-#' @param fold the fold of the cross validation, an integer larger than 1 and less than \eqn{N+1}. Ignored if \code{cv.indices != NULL}.
-#' @param cv.indices a list of indices of a cross validation splitting.
-#' If \code{cv.indices = NULL} then a random splitting will be generated using the \code{fold} argument.
+#' @param train a list of training samples, each item of the list corresponding to a subsample.
+#' Each item in the list must be a vector with the indices of the training samples for the corresponding subsample.
+#' The length of the list must equal the length of the \code{test} list.
+#' @param test a list of test samples, each item of the list corresponding to a subsample.
+#' Each item in the list must be vector with the indices of the test samples for the corresponding subsample.
+#' The length of the list must equal the length of the \code{training} list.
+#' @param collapse if \code{TRUE} the results for each subsample will be collapse into one result (this is useful if the subsamples are not overlapping)
 #' @param max.threads the maximal number of threads to be used.
 #' @param algorithm.config the algorithm configuration to be used.
 #' @return
-#' \item{Yhat}{the cross validation estimated response matrix}
-#' \item{Y.true}{the true response matrix, this is equal to the argument \code{y}}
-#' \item{cv.indices}{the cross validation splitting used}
+#' \item{Yhat}{if \code{collapse = FALSE} then a list of length \code{length(test)} containing the predicted responses for each of the test sets. If \code{collapse = TRUE} a list of length \code{length(lambda)}}
+#' \item{Y.true}{a list of length \code{length(test)} containing the true responses of the test samples}
 #' \item{features}{number of features used in the models}
 #' \item{parameters}{number of parameters used in the models.}
 #' @examples
@@ -53,26 +56,39 @@
 #' p <- 50 #number of features
 #' K <- 25  #number of groups
 #'
-#' B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=K)
-#' X1<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
-#' Y1 <-X1%*%B+matrix(rnorm(N*K,0,1),N,K)
+#' B <- matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=K)
+#' X1 <- matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
+#' Y1 <- X1%*%B+matrix(rnorm(N*K,0,1),N,K)
 #'
 #' ##Do cross validation
-#' lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 15L, lambda.min = 5, intercept = FALSE)
-#' fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
 #'
-#' ## Cross validation errors (estimated expected generalization error)
-#' Err(fit.cv)
+#' train <- replicate(2, sample(1:N, 50), simplify = FALSE)
+#' test <- lapply(train, function(idx) (1:N)[-idx])
+#'
+#' lambda <- lapply(train, function(idx)
+#'		lsgl.lambda(X1[idx,], Y1[idx,], alpha = 1, d = 15L, lambda.min = 5, intercept = FALSE))
+#'
+#' fit.sub <- lsgl.subsampling(X1, Y1, alpha = 1, lambda = lambda,
+#'		train = train, test = test, intercept = FALSE)
+#'
+#' Err(fit.sub)
+#'
 #' @author Martin Vincent
 #' @useDynLib lsgl, .registration=TRUE
 #' @export
 #' @importFrom utils packageVersion
-lsgl.cv <- function(x, y, intercept = TRUE,
+lsgl.subsampling <- function(x, y,
+		intercept = TRUE,
 		weights = NULL,
 		grouping = factor(1:ncol(x)),
 		groupWeights = c(sqrt(ncol(y)*table(grouping))),
 		parameterWeights =  matrix(1, nrow = ncol(y), ncol = ncol(x)),
-		alpha = 1, lambda, fold = 10L, cv.indices = list(), max.threads = 2L,
+		alpha = 1,
+		lambda,
+		train,
+		test,
+		collapse = FALSE,
+		max.threads = 2L,
 		algorithm.config = lsgl.standard.config)
 {
 
@@ -111,9 +127,7 @@ lsgl.cv <- function(x, y, intercept = TRUE,
 	# Print info
 	if(algorithm.config$verbose) {
 
-		n_fold <- if(length(cv.indices) == 0) fold else length(cv.indices)
-
-		cat("\nRunning lsgl", n_fold, "fold cross validation ")
+		cat("\nRunning lsgl subsampling with ", length(train)," subsamples ")
 		if(data$sparseX & data$sparseY) {
 			cat("(sparse design and response matrices)")
 		}
@@ -146,17 +160,32 @@ lsgl.cv <- function(x, y, intercept = TRUE,
 
 	callsym <- paste(obj, if(data$sparseX) "xs_" else "xd_", if(data$sparseY) "ys" else "yd", sep = "")
 
-	res <- sgl_cv(callsym, "lsgl", data, grouping, groupWeights, parameterWeights, alpha, lambda, fold, cv.indices, max.threads, algorithm.config)
+	res <- sgl_subsampling(callsym, "lsgl", data,
+		grouping, groupWeights, parameterWeights, alpha, lambda,
+		train, test, collapse, max.threads, algorithm.config)
 
 	# Add weights
 	res$weights <- weights
 
 	# Add true response
-	res$Y.true <- y
+	res$Y.true <- lapply(test, function(i) y[i,])
 
 	# Responses
-	res$Yhat <- lapply(res$responses$link, t)
+	if(collapse) {
+		res$Yhat <- res$responses$link
+	} else {
+		res$Yhat <- lapply(res$responses$link, function(x) lapply(x, t))
+	}
+
 	res$responses <- NULL
+
+  # Set names
+	cn <- colnames(y)
+  if( ! is.null(cn)) {
+		for(i in 1:length(train)) {
+			res$Yhat[[i]] <- lapply(X = res$Yhat[[i]], FUN = function(x) {colnames(x) <- cn; x})
+		}
+	}
 
 	res$lsgl_version <- packageVersion("lsgl")
 	res$intercept <- intercept
