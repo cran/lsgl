@@ -38,7 +38,7 @@ Y1 <-X1%*%B+matrix(rnorm(N*K,0,1),N,K)
 
 ##Do cross validation
 lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 25, lambda.min = 0.5, intercept = FALSE)
-fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE, max.threads = 1)
+fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
 
 ## Cross validation errors (estimated expected generalization error)
 if(min(Err(fit.cv, loss = "SOVE")) > 0.05) stop()
@@ -48,7 +48,7 @@ if(min(Err(fit.cv, loss = "SOVE")) > 0.05) stop()
 y <- Y1[,1]
 
 lambda <- lsgl.lambda(X1, y, alpha = 1, d = 25, lambda.min = 0.5, intercept = FALSE)
-fit.cv <- lsgl.cv(X1, y, alpha = 1, lambda = lambda, intercept = FALSE, max.threads = 1)
+fit.cv <- lsgl.cv(X1, y, alpha = 1, lambda = lambda, intercept = FALSE)
 
 ## Navigation tests
 Err(fit.cv)
@@ -60,11 +60,11 @@ best_model(fit.cv)
 Xna <- X1
 Xna[1,1] <- NA
 
-res <- try(fit.cv <- lsgl.cv(Xna, Y1, alpha = 1, lambda = lambda, intercept = FALSE, max.threads = 1), silent = TRUE)
+res <- try(fit.cv <- lsgl.cv(Xna, Y1, alpha = 1, lambda = lambda, intercept = FALSE), silent = TRUE)
 if(class(res) != "try-error") stop()
 
 Yna <- Y1
 Yna[1,1] <- NA
 
-res <- try(fit.cv <- lsgl.cv(X1, Yna, alpha = 1, lambda = lambda, intercept = FALSE, max.threads = 1), silent = TRUE)
+res <- try(fit.cv <- lsgl.cv(X1, Yna, alpha = 1, lambda = lambda, intercept = FALSE), silent = TRUE)
 if(class(res) != "try-error") stop()

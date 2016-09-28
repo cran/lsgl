@@ -8,7 +8,8 @@ lsgl.subsampling(x, y, intercept = TRUE, weights = NULL,
   grouping = factor(1:ncol(x)), groupWeights = c(sqrt(ncol(y) *
   table(grouping))), parameterWeights = matrix(1, nrow = ncol(y), ncol =
   ncol(x)), alpha = 1, lambda, train, test, collapse = FALSE,
-  max.threads = 2L, algorithm.config = lsgl.standard.config)
+  max.threads = NULL, use_parallel = FALSE,
+  algorithm.config = lsgl.standard.config)
 }
 \arguments{
 \item{x}{design matrix, matrix of size \eqn{N \times p}.}
@@ -39,7 +40,11 @@ The length of the list must equal the length of the \code{training} list.}
 
 \item{collapse}{if \code{TRUE} the results for each subsample will be collapse into one result (this is useful if the subsamples are not overlapping)}
 
-\item{max.threads}{the maximal number of threads to be used.}
+\item{max.threads}{Deprecated (will be removed in 2018),
+instead use \code{use_parallel = TRUE} and registre parallel backend (see package 'doParallel').
+The maximal number of threads to be used.}
+
+\item{use_parallel}{If \code{TRUE} the \code{foreach} loop will use \code{\%dopar\%}. The user must registre the parallel backend.}
 
 \item{algorithm.config}{the algorithm configuration to be used.}
 }
@@ -66,7 +71,7 @@ B <- matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,nco
 X1 <- matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
 Y1 <- X1\%*\%B+matrix(rnorm(N*K,0,1),N,K)
 
-##Do cross validation
+## Do cross subsampling
 
 train <- replicate(2, sample(1:N, 50), simplify = FALSE)
 test <- lapply(train, function(idx) (1:N)[-idx])
@@ -79,6 +84,16 @@ fit.sub <- lsgl.subsampling(X1, Y1, alpha = 1, lambda = lambda,
 
 Err(fit.sub)
 
+## Do the same cross subsampling using 2 parallel units
+cl <- makeCluster(2)
+registerDoParallel(cl)
+
+fit.sub <- lsgl.subsampling(X1, Y1, alpha = 1, lambda = lambda,
+	train = train, test = test, intercept = FALSE)
+
+stopCluster(cl)
+
+Err(fit.sub)
 }
 \author{
 Martin Vincent

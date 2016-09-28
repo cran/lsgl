@@ -49,7 +49,6 @@
 
 //Sgl optimizer
 #include <sgl.h>
-#include "pkg_c_config.h"
 
 // Objectives
 #include "frobenius_norm.h"

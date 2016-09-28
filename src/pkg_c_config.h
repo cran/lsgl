@@ -1,4 +1,4 @@
-//R interface
+/R interface
 
 extern "C" {
 
@@ -12,12 +12,6 @@ SEXP pkg_c_config() {
 	bool debug_on = false;
 #ifdef SGL_DEBUG
 	debug_on = true;
-#endif
-
-	//omp support
-	bool omp_supp = false;
-#ifdef SGL_OPENMP_SUPP
-	omp_supp = true;
 #endif
 
 	//profiling
@@ -53,7 +47,6 @@ SEXP pkg_c_config() {
 	rList res;
 	res.attach(rObject(debug_on), "debugging");
 	res.attach(rObject(timing), "timing");
-	res.attach(rObject(omp_supp), "omp.supported");
 	res.attach(rObject(runtime_checks), "runtime.checks");
 	res.attach(rObject(dim_checks), "dim.checks");
 	res.attach(rObject(conv_check), "convergence.checks");

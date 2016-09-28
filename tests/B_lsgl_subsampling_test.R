@@ -42,7 +42,7 @@ lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 25, lambda.min = 0.5, intercept = F
 train <- replicate(2, 1:N, simplify = FALSE)
 test <- list(1:20, 21:N)
 
-fit.sub <- lsgl.subsampling(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE, train = train, test = test, max.threads = 2)
+fit.sub <- lsgl.subsampling(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE, train = train, test = test)
 
 ## Navigation tests
 Err(fit.sub)

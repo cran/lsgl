@@ -39,7 +39,10 @@
 #' Each item in the list must be vector with the indices of the test samples for the corresponding subsample.
 #' The length of the list must equal the length of the \code{training} list.
 #' @param collapse if \code{TRUE} the results for each subsample will be collapse into one result (this is useful if the subsamples are not overlapping)
-#' @param max.threads the maximal number of threads to be used.
+#' @param max.threads Deprecated (will be removed in 2018),
+#' instead use \code{use_parallel = TRUE} and registre parallel backend (see package 'doParallel').
+#' The maximal number of threads to be used.
+#' @param use_parallel If \code{TRUE} the \code{foreach} loop will use \code{\%dopar\%}. The user must registre the parallel backend.
 #' @param algorithm.config the algorithm configuration to be used.
 #' @return
 #' \item{Yhat}{if \code{collapse = FALSE} then a list of length \code{length(test)} containing the predicted responses for each of the test sets. If \code{collapse = TRUE} a list of length \code{length(lambda)}}
@@ -60,7 +63,7 @@
 #' X1 <- matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
 #' Y1 <- X1%*%B+matrix(rnorm(N*K,0,1),N,K)
 #'
-#' ##Do cross validation
+#' ## Do cross subsampling
 #'
 #' train <- replicate(2, sample(1:N, 50), simplify = FALSE)
 #' test <- lapply(train, function(idx) (1:N)[-idx])
@@ -73,6 +76,16 @@
 #'
 #' Err(fit.sub)
 #'
+#' ## Do the same cross subsampling using 2 parallel units
+#' cl <- makeCluster(2)
+#' registerDoParallel(cl)
+#'
+#' fit.sub <- lsgl.subsampling(X1, Y1, alpha = 1, lambda = lambda,
+#'		train = train, test = test, intercept = FALSE)
+#'
+#' stopCluster(cl)
+#'
+#' Err(fit.sub)
 #' @author Martin Vincent
 #' @useDynLib lsgl, .registration=TRUE
 #' @export
@@ -88,7 +101,8 @@ lsgl.subsampling <- function(x, y,
 		train,
 		test,
 		collapse = FALSE,
-		max.threads = 2L,
+		max.threads = NULL,
+		use_parallel = FALSE,
 		algorithm.config = lsgl.standard.config)
 {
 
@@ -160,9 +174,20 @@ lsgl.subsampling <- function(x, y,
 
 	callsym <- paste(obj, if(data$sparseX) "xs_" else "xd_", if(data$sparseY) "ys" else "yd", sep = "")
 
-	res <- sgl_subsampling(callsym, "lsgl", data,
-		grouping, groupWeights, parameterWeights, alpha, lambda,
-		train, test, collapse, max.threads, algorithm.config)
+	res <- sgl_subsampling(callsym, "lsgl",
+			data = data,
+			parameterGrouping = grouping,
+			groupWeights = groupWeights,
+			parameterWeights = parameterWeights,
+			alpha = alpha,
+			lambda = lambda,
+			training = train,
+			test = test,
+			collapse = collapse,
+			max.threads = max.threads,
+			use_parallel = use_parallel,
+			algorithm.config = algorithm.config
+			)
 
 	# Add weights
 	res$weights <- weights

@@ -35,7 +35,10 @@
 #' @param fold the fold of the cross validation, an integer larger than 1 and less than \eqn{N+1}. Ignored if \code{cv.indices != NULL}.
 #' @param cv.indices a list of indices of a cross validation splitting.
 #' If \code{cv.indices = NULL} then a random splitting will be generated using the \code{fold} argument.
-#' @param max.threads the maximal number of threads to be used.
+#' @param max.threads Deprecated (will be removed in 2018),
+#' instead use \code{use_parallel = TRUE} and registre parallel backend (see package 'doParallel').
+#' The maximal number of threads to be used.
+#' @param use_parallel If \code{TRUE} the \code{foreach} loop will use \code{\%dopar\%}. The user must registre the parallel backend.
 #' @param algorithm.config the algorithm configuration to be used.
 #' @return
 #' \item{Yhat}{the cross validation estimated response matrix}
@@ -57,26 +60,42 @@
 #' X1<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
 #' Y1 <-X1%*%B+matrix(rnorm(N*K,0,1),N,K)
 #'
-#' ##Do cross validation
+#' ## Do cross validation
 #' lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 15L, lambda.min = 5, intercept = FALSE)
 #' fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
 #'
 #' ## Cross validation errors (estimated expected generalization error)
 #' Err(fit.cv)
+#'
+#' ## Do the same cross validation using 2 parallel units
+#' cl <- makeCluster(2)
+#' registerDoParallel(cl)
+#'
+#' fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE, use_parallel = TRUE)
+#'
+#' stopCluster(cl)
+#'
+#' Err(fit.cv)
 #' @author Martin Vincent
 #' @useDynLib lsgl, .registration=TRUE
 #' @export
 #' @importFrom utils packageVersion
-lsgl.cv <- function(x, y, intercept = TRUE,
+lsgl.cv <- function(x, y,
+	intercept = TRUE,
 		weights = NULL,
 		grouping = factor(1:ncol(x)),
 		groupWeights = c(sqrt(ncol(y)*table(grouping))),
 		parameterWeights =  matrix(1, nrow = ncol(y), ncol = ncol(x)),
-		alpha = 1, lambda, fold = 10L, cv.indices = list(), max.threads = 2L,
+		alpha = 1,
+		lambda,
+		fold = 10L,
+		cv.indices = list(),
+		max.threads = NULL,
+		use_parallel = FALSE,
 		algorithm.config = lsgl.standard.config)
 {
 
-	if(!is.matrix(y)) {
+	if( ! is.matrix(y) ) {
 		y <- as.matrix(y)
 	}
 
@@ -86,7 +105,7 @@ lsgl.cv <- function(x, y, intercept = TRUE,
 
 	if(!is.null(weights)) {
 		if(!all(dim(y) == dim(weights))) {
-			stop("w and y must have the same dimensions")
+			stop("weights and y must have the same dimensions")
 		}
 	}
 
@@ -146,7 +165,19 @@ lsgl.cv <- function(x, y, intercept = TRUE,
 
 	callsym <- paste(obj, if(data$sparseX) "xs_" else "xd_", if(data$sparseY) "ys" else "yd", sep = "")
 
-	res <- sgl_cv(callsym, "lsgl", data, grouping, groupWeights, parameterWeights, alpha, lambda, fold, cv.indices, max.threads, algorithm.config)
+	res <- sgl_cv(callsym, "lsgl",
+		data = data,
+		parameterGrouping = grouping,
+		groupWeights = groupWeights,
+		parameterWeights = parameterWeights,
+		alpha = alpha,
+		lambda = lambda,
+		fold = fold,
+		cv.indices = cv.indices,
+		max.threads = max.threads,
+		use_parallel = use_parallel,
+		algorithm.config = algorithm.config
+		)
 
 	# Add weights
 	res$weights <- weights

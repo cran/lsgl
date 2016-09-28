@@ -8,7 +8,8 @@ lsgl.cv(x, y, intercept = TRUE, weights = NULL,
   grouping = factor(1:ncol(x)), groupWeights = c(sqrt(ncol(y) *
   table(grouping))), parameterWeights = matrix(1, nrow = ncol(y), ncol =
   ncol(x)), alpha = 1, lambda, fold = 10L, cv.indices = list(),
-  max.threads = 2L, algorithm.config = lsgl.standard.config)
+  max.threads = NULL, use_parallel = FALSE,
+  algorithm.config = lsgl.standard.config)
 }
 \arguments{
 \item{x}{design matrix, matrix of size \eqn{N \times p}.}
@@ -34,7 +35,11 @@ lsgl.cv(x, y, intercept = TRUE, weights = NULL,
 \item{cv.indices}{a list of indices of a cross validation splitting.
 If \code{cv.indices = NULL} then a random splitting will be generated using the \code{fold} argument.}
 
-\item{max.threads}{the maximal number of threads to be used.}
+\item{max.threads}{Deprecated (will be removed in 2018),
+instead use \code{use_parallel = TRUE} and registre parallel backend (see package 'doParallel').
+The maximal number of threads to be used.}
+
+\item{use_parallel}{If \code{TRUE} the \code{foreach} loop will use \code{\%dopar\%}. The user must registre the parallel backend.}
 
 \item{algorithm.config}{the algorithm configuration to be used.}
 }
@@ -62,11 +67,21 @@ B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=
 X1<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
 Y1 <-X1\%*\%B+matrix(rnorm(N*K,0,1),N,K)
 
-##Do cross validation
+## Do cross validation
 lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 15L, lambda.min = 5, intercept = FALSE)
 fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
 
 ## Cross validation errors (estimated expected generalization error)
+Err(fit.cv)
+
+## Do the same cross validation using 2 parallel units
+cl <- makeCluster(2)
+registerDoParallel(cl)
+
+fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE, use_parallel = TRUE)
+
+stopCluster(cl)
+
 Err(fit.cv)
 }
 \author{

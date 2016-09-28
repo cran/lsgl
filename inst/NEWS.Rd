@@ -1,7 +1,7 @@
 \name{NEWS}
 \title{News for Package 'lsgl'}
 
-\section{Changes in lsgl version 1.2.1 (2016-09-10)}{
+\section{Changes in lsgl version 1.3.0 (2016-09-28)}{
 \itemize{
 \item Improved documentation and functionality:
 \itemize{
@@ -9,6 +9,10 @@
 	\item Minor updates and documentation corrections
   \item subsampling functionality added
 	\item subsampling supports different lambda sequences for each subsample
+	\item seed argument removed
+	\item Better handling of R memory protection (fewer PROTECT calls)
+	\item subsampling uses foreach and doParallel (showing a progressbar is no longer supported for subsampling and cross validation)
+	\item subsampling now supports different lambda sequences for each subsample
 }
  \item Fixes :
      \itemize{
