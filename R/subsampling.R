@@ -31,7 +31,8 @@
 #' @param groupWeights the group weights, a vector of length \eqn{m} (the number of groups).
 #' @param parameterWeights a matrix of size \eqn{K \times p}.
 #' @param alpha the \eqn{\alpha} value 0 for group lasso, 1 for lasso, between 0 and 1 gives a sparse group lasso penalty.
-#' @param lambda the lambda sequence for the regularization path.
+#' @param lambda lambda.min relative to lambda.max or the lambda sequence for the regularization path (that is a vector or a list of vectors with the lambda sequence for the subsamples).
+#' @param d length of lambda sequence (ignored if \code{length(lambda) > 1})
 #' @param train a list of training samples, each item of the list corresponding to a subsample.
 #' Each item in the list must be a vector with the indices of the training samples for the corresponding subsample.
 #' The length of the list must equal the length of the \code{test} list.
@@ -69,10 +70,24 @@
 #' test <- lapply(train, function(idx) (1:N)[-idx])
 #'
 #' lambda <- lapply(train, function(idx)
-#'		lsgl.lambda(X1[idx,], Y1[idx,], alpha = 1, d = 15L, lambda.min = 5, intercept = FALSE))
+#'	lsgl::lambda(
+#'		x = X1[idx,],
+#'		y = Y1[idx,],
+#'		alpha = 1,
+#'		d = 15L,
+#'		lambda.min = 5,
+#'		intercept = FALSE)
+#'	)
 #'
-#' fit.sub <- lsgl.subsampling(X1, Y1, alpha = 1, lambda = lambda,
-#'		train = train, test = test, intercept = FALSE)
+#' fit.sub <- lsgl::subsampling(
+#'	 x = X1,
+#'	 y = Y1,
+#'	 alpha = 1,
+#'	 lambda = lambda,
+#'	 train = train,
+#'	 test = test,
+#'	 intercept = FALSE
+#' )
 #'
 #' Err(fit.sub)
 #'
@@ -80,63 +95,57 @@
 #' cl <- makeCluster(2)
 #' registerDoParallel(cl)
 #'
-#' fit.sub <- lsgl.subsampling(X1, Y1, alpha = 1, lambda = lambda,
-#'		train = train, test = test, intercept = FALSE)
+#' # Run subsampling
+#' # Using a lambda sequence ranging from the maximal lambda to 0.1 * maximal lambda
+#' fit.sub <- lsgl::subsampling(
+#'	 x = X1,
+#'	 y = Y1,
+#'	 alpha = 1,
+#'	 lambda = 0.1,
+#'	 train = train,
+#'	 test = test,
+#'	 intercept = FALSE
+#' )
 #'
 #' stopCluster(cl)
 #'
 #' Err(fit.sub)
 #' @author Martin Vincent
-#' @useDynLib lsgl, .registration=TRUE
-#' @export
 #' @importFrom utils packageVersion
-lsgl.subsampling <- function(x, y,
-		intercept = TRUE,
-		weights = NULL,
-		grouping = factor(1:ncol(x)),
-		groupWeights = c(sqrt(ncol(y)*table(grouping))),
-		parameterWeights =  matrix(1, nrow = ncol(y), ncol = ncol(x)),
-		alpha = 1,
-		lambda,
-		train,
-		test,
-		collapse = FALSE,
-		max.threads = NULL,
-		use_parallel = FALSE,
-		algorithm.config = lsgl.standard.config)
+#' @importFrom sglOptim sgl_subsampling
+#' @importFrom methods is
+#' @export
+subsampling <- function(
+  x,
+  y,
+  intercept = TRUE,
+  weights = NULL,
+  grouping = NULL,
+  groupWeights = NULL,
+  parameterWeights =  NULL,
+  alpha = 1,
+  lambda,
+  d = 100,
+  train,
+  test,
+  collapse = FALSE,
+  max.threads = NULL,
+  use_parallel = FALSE,
+  algorithm.config = lsgl.standard.config)
 {
-
-	if(!is.matrix(y)) {
-		y <- as.matrix(y)
-	}
-
-	if(nrow(x) != nrow(y)) {
-		stop("x and y must have the same number of rows")
-	}
-
-	if(!is.null(weights)) {
-		if(!all(dim(y) == dim(weights))) {
-			stop("w and y must have the same dimensions")
-		}
-	}
 
 	# Get call
 	cl <- match.call()
 
-	# cast
-	grouping <- factor(grouping)
+	setup <- .process_args(x, y,
+		weights = weights,
+		intercept = intercept,
+		grouping = grouping,
+		groupWeights = groupWeights,
+		parameterWeights = parameterWeights
+	)
 
-	# add intercept
-	if(intercept) {
-		x <- cBind(Intercept = rep(1, nrow(x)), x)
-		groupWeights <- c(0, groupWeights)
-		parameterWeights <- cbind(rep(0, ncol(y)), parameterWeights)
-		grouping <- factor(c("Intercept", as.character(grouping)), levels = c("Intercept", levels(grouping)))
-	}
-
-	# create data
-	group.names <- if(is.null(colnames(y))) 1:ncol(y) else colnames(y)
-	data <- create.sgldata(x, y, weights = weights, group.names = group.names)
+	data <- setup$data
 
 	# Print info
 	if(algorithm.config$verbose) {
@@ -154,63 +163,42 @@ lsgl.subsampling <- function(x, y,
 
 		cat("\n\n")
 
-		print(data.frame('Samples: ' = print_with_metric_prefix(nrow(x)),
-						'Features: ' = print_with_metric_prefix(data$n.covariate),
-						'Models: ' = print_with_metric_prefix(ncol(y)),
-						'Groups: ' = print_with_metric_prefix(length(unique(grouping))),
-						'Parameters: ' = print_with_metric_prefix(length(parameterWeights)),
-						check.names = FALSE),
-				row.names = FALSE, digits = 2, right = TRUE)
+		print(data.frame(
+			'Samples: ' = print_with_metric_prefix(data$n_samples),
+			'Features: ' = print_with_metric_prefix(data$n_covariate),
+			'Models: ' = print_with_metric_prefix(ncol(data$data$Y)),
+			'Groups: ' = print_with_metric_prefix(length(unique(setup$grouping))),
+			'Parameters: ' = print_with_metric_prefix(length(setup$parameterWeights)),
+			check.names = FALSE),
+			row.names = FALSE, digits = 2, right = TRUE)
 		cat("\n")
 	}
 
-
-	# call SglOptimizer function
-	if(!is.null(weights)) {
-		obj <- "lsgl_w_"
-	} else {
-		obj <- "lsgl_"
-	}
-
-	callsym <- paste(obj, if(data$sparseX) "xs_" else "xd_", if(data$sparseY) "ys" else "yd", sep = "")
-
-	res <- sgl_subsampling(callsym, "lsgl",
-			data = data,
-			parameterGrouping = grouping,
-			groupWeights = groupWeights,
-			parameterWeights = parameterWeights,
-			alpha = alpha,
-			lambda = lambda,
-			training = train,
-			test = test,
-			collapse = collapse,
-			max.threads = max.threads,
-			use_parallel = use_parallel,
-			algorithm.config = algorithm.config
-			)
+	res <- sgl_subsampling(
+		module_name = setup$callsym,
+		PACKAGE = "lsgl",
+		data = data,
+		parameterGrouping = setup$grouping,
+		groupWeights = setup$groupWeights,
+		parameterWeights = setup$parameterWeights,
+		alpha =  alpha,
+		lambda = lambda,
+		d = d,
+		training = train,
+		test = test,
+		collapse = collapse,
+		responses = "link",
+		max.threads = max.threads,
+		use_parallel = use_parallel,
+		algorithm.config = algorithm.config
+	)
 
 	# Add weights
 	res$weights <- weights
 
-	# Add true response
-	res$Y.true <- lapply(test, function(i) y[i,])
-
 	# Responses
-	if(collapse) {
-		res$Yhat <- res$responses$link
-	} else {
-		res$Yhat <- lapply(res$responses$link, function(x) lapply(x, t))
-	}
-
+	res$Yhat <- res$responses$link
 	res$responses <- NULL
-
-  # Set names
-	cn <- colnames(y)
-  if( ! is.null(cn)) {
-		for(i in 1:length(train)) {
-			res$Yhat[[i]] <- lapply(X = res$Yhat[[i]], FUN = function(x) {colnames(x) <- cn; x})
-		}
-	}
 
 	res$lsgl_version <- packageVersion("lsgl")
 	res$intercept <- intercept
@@ -218,4 +206,48 @@ lsgl.subsampling <- function(x, y,
 
 	class(res) <- "lsgl"
 	return(res)
+}
+
+#' Deprecated subsampling function
+#'
+#' @keywords internal
+#' @export
+lsgl.subsampling <- function(
+  x,
+  y,
+  intercept = TRUE,
+  weights = NULL,
+  grouping = NULL,
+  groupWeights = NULL,
+  parameterWeights =  NULL,
+  alpha = 1,
+  lambda,
+  d = 100,
+  train,
+  test,
+  collapse = FALSE,
+  max.threads = NULL,
+  use_parallel = FALSE,
+  algorithm.config = lsgl.standard.config) {
+
+  warning("lsgl.subsampling is deprecated, use lsgl::subsampling")
+
+  lsgl::subsampling(
+    x = x,
+    y = y,
+    intercept = intercept,
+    weights = weights,
+    grouping = grouping,
+    groupWeights = groupWeights,
+    parameterWeights =  parameterWeights,
+    alpha = alpha,
+    lambda = lambda,
+    d = d,
+    train = train,
+    test = test,
+    collapse = collapse,
+    max.threads = max.threads,
+    use_parallel = use_parallel,
+    algorithm.config = algorithm.config
+  )
 }

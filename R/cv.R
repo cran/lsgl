@@ -31,7 +31,8 @@
 #' @param groupWeights the group weights, a vector of length \eqn{m} (the number of groups).
 #' @param parameterWeights a matrix of size \eqn{K \times p}.
 #' @param alpha the \eqn{\alpha} value 0 for group lasso, 1 for lasso, between 0 and 1 gives a sparse group lasso penalty.
-#' @param lambda the lambda sequence for the regularization path.
+#' @param lambda lambda.min relative to lambda.max or the lambda sequence for the regularization path.
+#' @param d length of lambda sequence (ignored if \code{length(lambda) > 1})
 #' @param fold the fold of the cross validation, an integer larger than 1 and less than \eqn{N+1}. Ignored if \code{cv.indices != NULL}.
 #' @param cv.indices a list of indices of a cross validation splitting.
 #' If \code{cv.indices = NULL} then a random splitting will be generated using the \code{fold} argument.
@@ -52,17 +53,16 @@
 #'
 #' ## Simulate from Y=XB+E, the dimension of Y is N x K, X is N x p, B is p x K
 #'
-#' N <- 100 #number of samples
-#' p <- 50 #number of features
-#' K <- 25  #number of groups
+#' N <- 50 #number of samples
+#' p <- 25 #number of features
+#' K <- 15  #number of groups
 #'
 #' B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=K)
 #' X1<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
 #' Y1 <-X1%*%B+matrix(rnorm(N*K,0,1),N,K)
 #'
 #' ## Do cross validation
-#' lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 15L, lambda.min = 5, intercept = FALSE)
-#' fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
+#' fit.cv <- lsgl::cv(X1, Y1, alpha = 1, lambda = 0.1, intercept = FALSE)
 #'
 #' ## Cross validation errors (estimated expected generalization error)
 #' Err(fit.cv)
@@ -71,61 +71,41 @@
 #' cl <- makeCluster(2)
 #' registerDoParallel(cl)
 #'
-#' fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE, use_parallel = TRUE)
+#' fit.cv <- lsgl::cv(X1, Y1, alpha = 1, lambda = 0.1, intercept = FALSE, use_parallel = TRUE)
 #'
 #' stopCluster(cl)
 #'
 #' Err(fit.cv)
 #' @author Martin Vincent
-#' @useDynLib lsgl, .registration=TRUE
-#' @export
 #' @importFrom utils packageVersion
-lsgl.cv <- function(x, y,
+#' @importFrom sglOptim sgl_cv
+#' @export
+cv <- function(x, y,
 	intercept = TRUE,
-		weights = NULL,
-		grouping = factor(1:ncol(x)),
-		groupWeights = c(sqrt(ncol(y)*table(grouping))),
-		parameterWeights =  matrix(1, nrow = ncol(y), ncol = ncol(x)),
-		alpha = 1,
-		lambda,
-		fold = 10L,
-		cv.indices = list(),
-		max.threads = NULL,
-		use_parallel = FALSE,
-		algorithm.config = lsgl.standard.config)
-{
-
-	if( ! is.matrix(y) ) {
-		y <- as.matrix(y)
-	}
-
-	if(nrow(x) != nrow(y)) {
-		stop("x and y must have the same number of rows")
-	}
-
-	if(!is.null(weights)) {
-		if(!all(dim(y) == dim(weights))) {
-			stop("weights and y must have the same dimensions")
-		}
-	}
+	weights = NULL,
+	grouping = NULL,
+	groupWeights = NULL,
+	parameterWeights = NULL,
+	alpha = 1,
+	lambda,
+	d = 100,
+	fold = 10L,
+	cv.indices = list(),
+	max.threads = NULL,
+	use_parallel = FALSE,
+	algorithm.config = lsgl.standard.config) {
 
 	# Get call
 	cl <- match.call()
 
-	# cast
-	grouping <- factor(grouping)
+	setup <- .process_args(x, y,
+		weights = weights,
+		intercept = intercept,
+		grouping = grouping,
+		groupWeights = groupWeights,
+		parameterWeights = parameterWeights)
 
-	# add intercept
-	if(intercept) {
-		x <- cBind(Intercept = rep(1, nrow(x)), x)
-		groupWeights <- c(0, groupWeights)
-		parameterWeights <- cbind(rep(0, ncol(y)), parameterWeights)
-		grouping <- factor(c("Intercept", as.character(grouping)), levels = c("Intercept", levels(grouping)))
-	}
-
-	# create data
-	group.names <- if(is.null(colnames(y))) 1:ncol(y) else colnames(y)
-	data <- create.sgldata(x, y, weights = weights, group.names = group.names)
+	data <- setup$data
 
 	# Print info
 	if(algorithm.config$verbose) {
@@ -145,35 +125,31 @@ lsgl.cv <- function(x, y,
 
 		cat("\n\n")
 
-		print(data.frame('Samples: ' = print_with_metric_prefix(nrow(x)),
-						'Features: ' = print_with_metric_prefix(data$n.covariate),
-						'Models: ' = print_with_metric_prefix(ncol(y)),
-						'Groups: ' = print_with_metric_prefix(length(unique(grouping))),
-						'Parameters: ' = print_with_metric_prefix(length(parameterWeights)),
-						check.names = FALSE),
-				row.names = FALSE, digits = 2, right = TRUE)
+		print(data.frame(
+			'Samples: ' = print_with_metric_prefix(data$n_samples),
+			'Features: ' = print_with_metric_prefix(data$n_covariate),
+			'Models: ' = print_with_metric_prefix(ncol(data$data$Y)),
+			'Groups: ' = print_with_metric_prefix(length(unique(setup$grouping))),
+			'Parameters: ' = print_with_metric_prefix(length(setup$parameterWeights)),
+			check.names = FALSE),
+		row.names = FALSE, digits = 2, right = TRUE)
+
 		cat("\n")
 	}
 
-
-	# call SglOptimizer function
-	if(!is.null(weights)) {
-		obj <- "lsgl_w_"
-	} else {
-		obj <- "lsgl_"
-	}
-
-	callsym <- paste(obj, if(data$sparseX) "xs_" else "xd_", if(data$sparseY) "ys" else "yd", sep = "")
-
-	res <- sgl_cv(callsym, "lsgl",
+	res <- sgl_cv(
+		module_name = setup$callsym,
+		PACKAGE = "lsgl",
 		data = data,
-		parameterGrouping = grouping,
-		groupWeights = groupWeights,
-		parameterWeights = parameterWeights,
-		alpha = alpha,
+		parameterGrouping = setup$grouping,
+		groupWeights = setup$groupWeights,
+		parameterWeights = setup$parameterWeights,
+		alpha =  alpha,
 		lambda = lambda,
+		d = d,
 		fold = fold,
 		cv.indices = cv.indices,
+		responses = c("link"),
 		max.threads = max.threads,
 		use_parallel = use_parallel,
 		algorithm.config = algorithm.config
@@ -182,11 +158,7 @@ lsgl.cv <- function(x, y,
 	# Add weights
 	res$weights <- weights
 
-	# Add true response
-	res$Y.true <- y
-
-	# Responses
-	res$Yhat <- lapply(res$responses$link, t)
+	res$Yhat <- res$responses$link
 	res$responses <- NULL
 
 	res$lsgl_version <- packageVersion("lsgl")
@@ -195,4 +167,47 @@ lsgl.cv <- function(x, y,
 
 	class(res) <- "lsgl"
 	return(res)
+}
+
+#' Deprecated cv function
+#'
+#' @keywords internal
+#' @export
+lsgl.cv <- function(
+  x,
+  y,
+  intercept = TRUE,
+  weights = NULL,
+  grouping = NULL,
+  groupWeights = NULL,
+  parameterWeights = NULL,
+  alpha = 1,
+  lambda,
+  d = 100,
+  fold = 10L,
+  cv.indices = list(),
+  max.threads = NULL,
+  use_parallel = FALSE,
+  algorithm.config = lsgl.standard.config) {
+
+  warning("lsgl.subsampling is deprecated, use lsgl::subsampling")
+
+  lsgl::cv(
+    x = x,
+    y = y,
+    intercept = intercept,
+    weights = weights,
+    grouping = grouping,
+    groupWeights = groupWeights,
+    parameterWeights = parameterWeights,
+    alpha = alpha,
+    lambda = lambda,
+    d = d,
+    fold = fold,
+    cv.indices = cv.indices,
+    max.threads = max.threads,
+    use_parallel = use_parallel,
+    algorithm.config = algorithm.config
+  )
+
 }

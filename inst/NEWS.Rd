@@ -1,7 +1,22 @@
 \name{NEWS}
 \title{News for Package 'lsgl'}
 
-\section{Changes in lsgl version 1.3.0 (2016-09-28)}{
+\section{Changes in lsgl version 1.3.5 (2016-12-28)}{
+\itemize{
+  \item API changes:
+  \itemize{
+    \item lsgl.lambda deprecated use lsgl::lambda
+    \item lsgl deprecated use lsgl::fit
+    \item lsgl.cv deprecated use lsgl::cv
+    \item lsgl.subsampling deprecated use lsgl::subsampling
+  }
+  \item fit, cv and subsampling supports relative lambda
+  \item Code cleanup, bug fixes and refactoring
+  \item added quick-start vignette
+}
+}
+
+\section{Changes in lsgl version 1.2.1 (2016-09-10)}{
 \itemize{
 \item Improved documentation and functionality:
 \itemize{
@@ -9,10 +24,6 @@
 	\item Minor updates and documentation corrections
   \item subsampling functionality added
 	\item subsampling supports different lambda sequences for each subsample
-	\item seed argument removed
-	\item Better handling of R memory protection (fewer PROTECT calls)
-	\item subsampling uses foreach and doParallel (showing a progressbar is no longer supported for subsampling and cross validation)
-	\item subsampling now supports different lambda sequences for each subsample
 }
  \item Fixes :
      \itemize{

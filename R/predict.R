@@ -48,8 +48,8 @@
 #' Y2 <-X2%*%B+matrix(rnorm(N*K,0,1),N,K)
 #'
 #' #### Fit models using X1
-#' lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 25L, lambda.min = 0.5, intercept = FALSE)
-#' fit <- lsgl(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
+#' lambda <- lsgl::lambda(X1, Y1, alpha = 1, d = 25L, lambda.min = 0.5, intercept = FALSE)
+#' fit <- lsgl::fit(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
 #'
 #' # Predict Y2 using the estimated models and X2
 #' res <- predict(fit, X2)
@@ -64,14 +64,18 @@
 #' @method predict lsgl
 #' @importFrom methods is
 #' @importFrom methods as
+#' @importFrom sglOptim sgl_predict
+#' @importFrom sglOptim create.sgldata
 #' @export
-#' @useDynLib lsgl, .registration=TRUE
 predict.lsgl <- function(object, x, sparse.data = is(x, "sparseMatrix"), ...)
 {
+
 	# Get call
 	cl <- match.call()
 
 	if(is.null(object$beta)) stop("No models found -- missing beta")
+
+	object$beta <- lapply(object$beta, t)
 
 	if(object$intercept){
 		# add intercept
@@ -79,36 +83,30 @@ predict.lsgl <- function(object, x, sparse.data = is(x, "sparseMatrix"), ...)
 	}
 
 	#Check dimension of x
-	if(dim(object$beta[[1]])[1] != ncol(x)) stop("x has wrong dimension")
+	if(dim(object$beta[[1]])[2] != ncol(x)) stop("x has wrong dimension")
 
-	object$beta <- lapply(object$beta, t)
+	data <- create.sgldata(
+		x = x,
+		y = NULL,
+		response_dimension = nrow(object$beta[[1]]),
+		response_names = rownames(object$beta[[1]]),
+		sparseX = sparse.data,
+		sparseY = FALSE
+	)
 
-	data <- list()
-	data$sparseX <- FALSE
-	data$sample.names <- rownames(x)
-	data$n.samples <- nrow(x)
-
-  if(sparse.data) {
-
-		data$X <- as(x, "CsparseMatrix")
-		data$sparseX <- TRUE
-
-		res <- sgl_predict("lsgl_xs_yd", "lsgl", object, data)
-
-	} else {
-
-		data$X <- as.matrix(x)
-
-		res <- sgl_predict("lsgl_xd_yd", "lsgl", object, data)
-
-	}
+	res <- sgl_predict(
+		module_name = "lsgl_xd_yd",
+		PACKAGE = "lsgl",
+		object = object,
+		data = data,
+		responses = "link")
 
 	#Responses
-
-	res$Yhat <- lapply(res$responses$link, t)
+	res$Yhat <-res$responses$link
 	res$responses <- NULL
 
 	res$call <- cl
+  res$lsgl_version <- packageVersion("lsgl")
 	class(res) <- "lsgl"
 
 	return(res)

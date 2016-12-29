@@ -1,4 +1,4 @@
-/R interface
+//R interface
 
 extern "C" {
 

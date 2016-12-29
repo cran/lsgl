@@ -19,6 +19,8 @@
 #ifndef FOBENIUS_NORM_HPP_
 #define FOBENIUS_NORM_HPP_
 
+using namespace sgl;
+
 //type_X : sgl::matrix or sgl::sparse_matrix
 //type_Y : sgl::matrix or sgl::sparse_matrix
 
@@ -27,87 +29,83 @@ class FrobeniusLoss {
 
 public:
 
-	const sgl::natural n_samples;
-	const sgl::natural n_responses;
-	const sgl::natural n_variables; // number of parameters
+	const natural n_samples;
+	const natural n_responses;
+	const natural n_variables; // number of parameters
 
 private:
 
 	type_Y const& Y; //response - matrix of size n_samples x n_responses
-	sgl::matrix lp; //linear predictors - matrix of size n_samples x n_responses
+	matrix lp; //linear predictors - matrix of size n_samples x n_responses
 
 public:
 
-	typedef sgl::hessian_identity<true> hessian_type; //constant hessians of type double * Id
-	//typedef sgl::hessian_full hessian_type;
+	typedef hessian_identity<true> hessian_type; //constant hessians of type double * Id
 
-	typedef sgl::DataPackage_2< sgl::MatrixData<type_X>,
-				sgl::MultiResponse<type_Y, 'Y'> > data_type;
+	typedef DataPackage_2<
+		MatrixData<type_X>,
+		MultiResponse<type_Y, 'Y'> > data_type
+	;
 
+	FrobeniusLoss()	:
+	 	n_samples(0),
+		n_responses(0),
+		n_variables(0),
+		Y(null_matrix),
+		lp(n_samples, n_responses)	{}
 
+	FrobeniusLoss(data_type const& data) :
+		n_samples(data.get_A().n_samples),
+		n_responses(data.get_B().n_responses),
+		n_variables(n_responses),
+		Y(data.get_B().response),
+		lp(n_samples, n_responses) {}
 
-	FrobeniusLoss()
-			: 	n_samples(0),
-				n_responses(0),
-				n_variables(0),
-				Y(sgl::null_matrix),
-				lp(n_samples, n_responses)	{
-	}
-
-	FrobeniusLoss(data_type const& data)
-			: 	n_samples(data.get_A().n_samples),
-				n_responses(data.get_B().n_responses),
-				n_variables(n_responses),
-				Y(data.get_B().response),
-				lp(n_samples, n_responses) {
-	}
-
-	void set_lp(sgl::matrix const& lp)
-	{
+	void set_lp(matrix const& lp) {
 		this->lp = lp;
 	}
 
-	void set_lp_zero()
-	{
-		lp.zeros(n_samples, n_responses);
+	void set_lp_zero() {
+		lp.zeros();
 	}
 
-	const sgl::matrix gradients() const
-	{
+	const matrix gradients() const {
 		return static_cast<double>(2)/static_cast<double>(n_samples)*trans(lp-Y);
 	}
 
-	void compute_hessians() const
-	{
+	void compute_hessians() const {
 		return;
 	}
 
-    const double hessians(sgl::natural i) const
-	{
+  const double hessians(natural i) const {
 		return static_cast<double>(2)/static_cast<double>(n_samples);
 	}
 
-	const sgl::numeric sum_values() const
-	{
-		return trace(trans(lp-Y)*(lp-Y))/static_cast<double>(n_samples);
+	const numeric sum_values() const	{
+		return accu((lp-Y)%(lp-Y))/static_cast<double>(n_samples);
 	}
 
 };
 
 // Std design matrix
-typedef sgl::ObjectiveFunctionType < sgl::GenralizedLinearLossDense < FrobeniusLoss < sgl::matrix, sgl::matrix > > ,
-		FrobeniusLoss < sgl::matrix, sgl::matrix >::data_type > frobenius;
+typedef ObjectiveFunctionType <
+	GenralizedLinearLossDense <
+		FrobeniusLoss < matrix, matrix > > > frobenius
+;
 
-typedef sgl::ObjectiveFunctionType <
-		sgl::GenralizedLinearLossSparse < FrobeniusLoss < sgl::sparse_matrix, sgl::matrix > > ,
-		FrobeniusLoss < sgl::sparse_matrix, sgl::matrix >::data_type > frobenius_spx;
+typedef ObjectiveFunctionType <
+	GenralizedLinearLossSparse <
+		FrobeniusLoss < sparse_matrix, matrix > > > frobenius_spx
+;
 
-typedef sgl::ObjectiveFunctionType <
-		sgl::GenralizedLinearLossDense < FrobeniusLoss < sgl::matrix, sgl::sparse_matrix > > ,
-		FrobeniusLoss < sgl::matrix, sgl::sparse_matrix >::data_type > frobenius_spy;
+typedef ObjectiveFunctionType <
+	GenralizedLinearLossDense <
+		FrobeniusLoss < matrix, sparse_matrix > > > frobenius_spy
+;
 
-typedef sgl::ObjectiveFunctionType <
-		sgl::GenralizedLinearLossSparse < FrobeniusLoss < sgl::sparse_matrix, sgl::sparse_matrix > > ,
-		FrobeniusLoss < sgl::sparse_matrix, sgl::sparse_matrix >::data_type > frobenius_spx_spy;
+typedef ObjectiveFunctionType <
+	GenralizedLinearLossSparse <
+		FrobeniusLoss < sparse_matrix, sparse_matrix > > > frobenius_spx_spy
+;
 
 #endif /* FOBENIUS_NORM_HPP_ */

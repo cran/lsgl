@@ -20,6 +20,7 @@
 #
 
 library(lsgl)
+library(methods)
 
 # warnings = errors
 options(warn=2)
@@ -36,15 +37,38 @@ B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=
 X1<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
 Y1 <-X1%*%B+matrix(rnorm(N*K,0,1),N,K)
 
+W <- matrix(1/5, nrow = N, ncol = K)
+
 ##Do cross validation
-lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 25, lambda.min = 0.5, intercept = FALSE)
-
-cl <- makeCluster(2)
-registerDoParallel(cl)
-
-fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE, use_parallel = TRUE)
-
-stopCluster(cl)
+lambda <- lsgl::lambda(X1, Y1, alpha = 1, d = 25, lambda.min = 0.5,  weights = W, intercept = FALSE)
+fit.cv <- lsgl::cv(X1, Y1, alpha = 1, lambda = lambda,  weights = W, intercept = FALSE)
 
 ## Cross validation errors (estimated expected generalization error)
 if(min(Err(fit.cv, loss = "SOVE")) > 0.05) stop()
+
+
+## Test single fit i.e. K = 1
+y <- Y1[,1]
+W <- W[,1]
+
+lambda <- lsgl::lambda(X1, y, alpha = 1, d = 25, lambda.min = 0.5,  weights = W, intercept = FALSE)
+fit.cv <- lsgl::cv(X1, y, alpha = 1, lambda = lambda,  weights = W, intercept = FALSE)
+
+## Navigation tests
+Err(fit.cv)
+features_stat(fit.cv)
+parameters_stat(fit.cv)
+best_model(fit.cv)
+
+### Test for errors if X or Y contains NA
+Xna <- X1
+Xna[1,1] <- NA
+
+res <- try(fit.cv <- lsgl::cv(Xna, Y1, alpha = 1, lambda = lambda,  weights = W, intercept = FALSE), silent = TRUE)
+if(class(res) != "try-error") stop()
+
+Yna <- Y1
+Yna[1,1] <- NA
+
+res <- try(fit.cv <- lsgl::cv(X1, Yna, alpha = 1, lambda = lambda,  weights = W, intercept = FALSE), silent = TRUE)
+if(class(res) != "try-error") stop()

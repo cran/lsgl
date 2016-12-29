@@ -16,6 +16,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
+using namespace sgl;
+
 #ifndef FOBENIUS_NORM_WEIGHTED_HPP_
 #define FOBENIUS_NORM_WEIGHTED_HPP_
 
@@ -27,91 +29,80 @@ class FrobeniusLossWeighted {
 
 public:
 
-	const sgl::natural n_samples;
-	const sgl::natural n_responses;
-	const sgl::natural n_variables; // number of parameters
+	const natural n_variables; // number of parameters
 
 private:
 
 	type_Y const& Y; //response - matrix of size n_samples x n_responses
-	sgl::matrix const& W; //vector of size n_samples x n_responses
+	matrix const& W; //vector of size n_samples x n_responses
 
-	sgl::matrix lp; //linear predictors - matrix of size n_samples x n_responses
+	matrix lp; //linear predictors - matrix of size n_samples x n_responses
 
 public:
 
-	typedef sgl::hessian_diagonal<false> hessian_type;
+	typedef hessian_diagonal<false> hessian_type;
 
-	typedef sgl::DataPackage_3< sgl::MatrixData<type_X>,
-				sgl::MultiResponse<type_Y, 'Y'>,
-				sgl::Data<sgl::matrix, 'W'> > data_type;
+	typedef DataPackage_3<
+		MatrixData<type_X>,
+		MultiResponse<type_Y, 'Y'>,
+		Data<sgl::matrix, 'W'> > data_type;
 
+	FrobeniusLossWeighted() 	:
+		n_variables(0),
+		Y(null_matrix),
+		W(null_matrix),
+		lp(null_matrix)	{}
 
+	FrobeniusLossWeighted(data_type const& data) :
+		n_variables(data.get_B().n_responses),
+		Y(data.get_B().response),
+		W(data.get_C().data),
+		lp(data.get_A().n_samples, n_variables) {}
 
-	FrobeniusLossWeighted()
-			: 	n_samples(0),
-				n_responses(0),
-				n_variables(n_responses),
-				Y(sgl::null_matrix),
-				W(sgl::null_matrix),
-				lp(n_samples, n_responses)	{
-	}
-
-	FrobeniusLossWeighted(data_type const& data)
-			: 	n_samples(data.get_A().n_samples),
-				n_responses(data.get_B().n_responses),
-				n_variables(n_responses),
-				Y(data.get_B().response),
-				W(data.get_C().data),
-				lp(n_samples, n_responses) {
-	}
-
-	void set_lp(sgl::matrix const& lp)
-	{
+	void set_lp(matrix const& lp) {
 		this->lp = lp;
 	}
 
-	void set_lp_zero()
-	{
-		lp.zeros(n_samples, n_responses);
+	void set_lp_zero() {
+		lp.zeros();
 	}
 
-	const sgl::matrix gradients() const
-	{
+	const matrix gradients() const {
 		return static_cast<double>(2)*trans(W%(lp-Y));
 	}
 
-	void compute_hessians() const
-	{
+	void compute_hessians() const	{
 		return;
 	}
 
-    const sgl::vector hessians(sgl::natural i) const
-	{
-		return static_cast<double>(2)*W.row(i);
+  const hessian_type::representation hessians(natural i) const {
+		return static_cast<double>(2)*trans(W.row(i));
 	}
 
-	const sgl::numeric sum_values() const
-	{
+	const numeric sum_values() const {
 		return accu(W%(lp-Y)%(lp-Y));
-//		return trace(trans(lp-Y)*(lp-Y))/static_cast<double>(n_samples);
 	}
 
 };
 
-typedef sgl::ObjectiveFunctionType < sgl::GenralizedLinearLossDense < FrobeniusLossWeighted < sgl::matrix, sgl::matrix > > ,
-		FrobeniusLossWeighted < sgl::matrix, sgl::matrix >::data_type > frobenius_w;
+typedef ObjectiveFunctionType <
+	GenralizedLinearLossDense < 
+		FrobeniusLossWeighted < matrix, matrix > > > frobenius_w
+;
 
-typedef sgl::ObjectiveFunctionType <
-		sgl::GenralizedLinearLossSparse < FrobeniusLossWeighted < sgl::sparse_matrix, sgl::matrix > > ,
-		FrobeniusLossWeighted < sgl::sparse_matrix, sgl::matrix >::data_type > frobenius_w_spx;
+typedef ObjectiveFunctionType <
+	GenralizedLinearLossSparse <
+		FrobeniusLossWeighted < sparse_matrix, matrix > > > frobenius_w_spx
+;
 
-typedef sgl::ObjectiveFunctionType <
-		sgl::GenralizedLinearLossDense < FrobeniusLossWeighted < sgl::matrix, sgl::sparse_matrix > > ,
-		FrobeniusLossWeighted < sgl::matrix, sgl::sparse_matrix >::data_type > frobenius_w_spy;
+typedef ObjectiveFunctionType <
+	GenralizedLinearLossDense <
+		FrobeniusLossWeighted < matrix, sparse_matrix > > > frobenius_w_spy
+;
 
-typedef sgl::ObjectiveFunctionType <
-		sgl::GenralizedLinearLossSparse < FrobeniusLossWeighted < sgl::sparse_matrix, sgl::sparse_matrix > > ,
-		FrobeniusLossWeighted < sgl::sparse_matrix, sgl::sparse_matrix >::data_type > frobenius_w_spx_spy;
+typedef ObjectiveFunctionType <
+	GenralizedLinearLossSparse <
+		FrobeniusLossWeighted < sparse_matrix, sparse_matrix > > > frobenius_w_spx_spy
+;
 
 #endif /* FOBENIUS_NORM_WEIGHTED_HPP_ */

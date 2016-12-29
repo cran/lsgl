@@ -35,6 +35,7 @@
 #' @param stepsize_opt_penalized_initial_t initial step-size.
 #' @param stepsize_opt_penalized_a step-size optimization parameter.
 #' @param stepsize_opt_penalized_b step-size optimization parameter.
+#' @param max_iterations_outer max iteration of outer loop
 #' @param inner_loop_convergence_limit inner loop convergence limit.
 #' @param verbose If \code{TRUE} some information, regarding the status of the algorithm, will be printed in the R terminal.
 #' @return A configuration.
@@ -56,9 +57,9 @@
 #' # Create configuration
 #' config <- lsgl.algorithm.config(verbose = FALSE)
 #'
-#' lambda<-lsgl.lambda(X,Y, alpha=1, lambda.min=.5, intercept=FALSE, algorithm.config = config)
+#' lambda<-lsgl::lambda(X,Y, alpha=1, lambda.min=.5, intercept=FALSE, algorithm.config = config)
 #'
-#' fit <-lsgl(X,Y, alpha=1, lambda = lambda, intercept=FALSE, algorithm.config = config)
+#' fit <-lsgl::fit(X,Y, alpha=1, lambda = lambda, intercept=FALSE, algorithm.config = config)
 #' @author Martin Vincent
 #' @export
 lsgl.algorithm.config <- function(tolerance_penalized_main_equation_loop = 1e-10,
@@ -73,6 +74,7 @@ lsgl.algorithm.config <- function(tolerance_penalized_main_equation_loop = 1e-10
 		stepsize_opt_penalized_initial_t = 1,
 		stepsize_opt_penalized_a = 0.1,
 		stepsize_opt_penalized_b = 0.1,
+		max_iterations_outer = 1e4,
 		inner_loop_convergence_limit = 1e5,
 		verbose = TRUE) {
 
@@ -96,6 +98,7 @@ lsgl.algorithm.config <- function(tolerance_penalized_main_equation_loop = 1e-10
 	config$stepsize_opt_penalized_a <- stepsize_opt_penalized_a
 	config$stepsize_opt_penalized_b <- stepsize_opt_penalized_b
 
+	config$max_iterations_outer <- as.integer(max_iterations_outer)
 	config$inner_loop_convergence_limit <- as.integer(inner_loop_convergence_limit)
 
 	config$verbose <- verbose
@@ -110,3 +113,13 @@ lsgl.algorithm.config <- function(tolerance_penalized_main_equation_loop = 1e-10
 #' @author Martin Vicnet
 #' @export
 lsgl.standard.config <- lsgl.algorithm.config();
+
+#' Featch information about the C side configuration of the package
+#' @return list
+#'
+#' @author Martin Vicnet
+#' @useDynLib lsgl r_pkg_c_config
+#' @export
+lsgl.c.config <- function() {
+	.Call("r_pkg_c_config")
+}

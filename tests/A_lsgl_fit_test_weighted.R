@@ -20,6 +20,7 @@
 #
 
 library(lsgl)
+library(methods)
 
 # warnings = errors
 options(warn=2)
@@ -36,11 +37,13 @@ K <- 25  #number of groups
 B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=K)
 
 X<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
-Y<-X%*%B+matrix(rnorm(N*K,0,1),N,K)
+Y<-X%*%B+matrix(rnorm(N*K,0,1), nrow = N, ncol = K)
 
-lambda<-lsgl.lambda(X,Y, alpha=1, lambda.min=.5, intercept=FALSE)
+W <- matrix(1/N, nrow = N, ncol = K)
 
-fit <-lsgl(X,Y, alpha=1, lambda = lambda, intercept=FALSE)
+lambda<-lsgl::lambda(X,Y, alpha=1, lambda.min=1, weights = W, intercept=FALSE)
+
+fit <-lsgl::fit(X,Y, alpha=1, lambda = lambda, weights = W, intercept=FALSE)
 
 ## ||B - \beta||_F
 if(min(sapply(fit$beta, function(beta) sum((B - beta)^2))) > 11) stop()
@@ -48,9 +51,10 @@ if(min(sapply(fit$beta, function(beta) sum((B - beta)^2))) > 11) stop()
 
 ## Test single fit i.e. K = 1
 y <- Y[,1]
+W <- W[,1]
 
-lambda<-lsgl.lambda(X,y, alpha=1, lambda.min=.5, intercept=FALSE)
-fit <-lsgl(X, y, alpha=1, lambda = lambda, intercept=FALSE)
+lambda<-lsgl::lambda(X,y, alpha=1, lambda.min=1, weights = W, intercept=FALSE)
+fit <-lsgl::fit(X, y, alpha=1, lambda = lambda, weights = W, intercept=FALSE)
 res <- predict(fit, X)
 
 
@@ -60,21 +64,28 @@ print(fit)
 features_stat(fit)
 parameters_stat(fit)
 
+# Test with intercept
+lambda<-lsgl::lambda(X,y, alpha=1, lambda.min=1, weights = W, intercept=TRUE)
+fit <-lsgl::fit(X, y, alpha=1, lambda = lambda, weights = W, intercept=TRUE)
+res <- predict(fit, X)
+
+
+
 ### Test for errors if X or Y contains NA
 Xna <- X
 Xna[1,1] <- NA
 
-res <- try(lambda<-lsgl.lambda(Xna, Y, alpha=1, lambda.min=.5, intercept=FALSE), silent = TRUE)
+res <- try(lambda<-lsgl::lambda(Xna, Y, alpha=1, lambda.min=.5, weights = W, intercept=FALSE), silent = TRUE)
 if(class(res) != "try-error") stop()
 
-res <- try(fit <-lsgl(Xna, Y, alpha=1, lambda = lambda, intercept=FALSE), silent = TRUE)
+res <- try(fit <-lsgl::fit(Xna, Y, alpha=1, lambda = lambda, weights = W, intercept=FALSE), silent = TRUE)
 if(class(res) != "try-error") stop()
 
 Yna <- Y
 Yna[1,1] <- NA
 
-res <- try(lambda<-lsgl.lambda(X, Yna, alpha=1, lambda.min=.5, intercept=FALSE), silent = TRUE)
+res <- try(lambda<-lsgl::lambda(X, Yna, alpha=1, lambda.min=.5, weights = W, intercept=FALSE), silent = TRUE)
 if(class(res) != "try-error") stop()
 
-res <- try(fit <-lsgl(X, Yna, alpha=1, lambda = lambda, intercept=FALSE), silent = TRUE)
+res <- try(fit <-lsgl::fit(X, Yna, alpha=1, lambda = lambda, weights = W, intercept=FALSE), silent = TRUE)
 if(class(res) != "try-error") stop()

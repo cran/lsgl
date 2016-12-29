@@ -20,6 +20,8 @@
 #
 
 library(lsgl)
+library(tools)
+library(methods)
 
 # warnings = errors
 options(warn=2)
@@ -36,19 +38,54 @@ B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=
 X1<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
 Y1 <-X1%*%B+matrix(rnorm(N*K,0,1),N,K)
 
+rownames(X1) <- paste("sample", 1:N)
+colnames(X1) <- paste("feature", 1:p)
+rownames(Y1) <- paste("sample", 1:N)
+colnames(Y1) <- paste("model", 1:K)
+
 ##Do cross validation
-lambda <- lsgl.lambda(X1, Y1, alpha = 1, d = 25, lambda.min = 0.5, intercept = FALSE)
-fit.cv <- lsgl.cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
+lambda <- lsgl::lambda(X1, Y1, alpha = 1, d = 25, lambda.min = 0.5, intercept = FALSE)
+fit.cv <- lsgl::cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE)
+
+stopifnot(all.equal(dimnames(fit.cv$Yhat[[10]]), list(rownames(X1), colnames(Y1))))
 
 ## Cross validation errors (estimated expected generalization error)
 if(min(Err(fit.cv, loss = "SOVE")) > 0.05) stop()
+
+if(best_model(fit.cv) < 20) stop()
+if(best_model(fit.cv) > 30) stop()
+
+print(fit.cv)
+# Test sparse X, Y and intercept
+
+Xsp <- as(X1, "CsparseMatrix")
+Ysp <- as(Y1, "CsparseMatrix")
+
+lambda<-lsgl::lambda(X1, Y1, alpha=1, lambda.min= 1, intercept = TRUE)
+fit <-lsgl::cv(X1, Y1, alpha=1, lambda = lambda, intercept = TRUE)
+
+lambda<-lsgl::lambda(Xsp, Y1, alpha=1, lambda.min= 1, intercept = TRUE)
+fit <-lsgl::cv(Xsp, Y1, alpha=1, lambda = lambda, intercept = TRUE)
+
+lambda<-lsgl::lambda(X1, Ysp, alpha=1, lambda.min= 1, intercept = TRUE)
+fit <-lsgl::cv(X1, Ysp, alpha=1, lambda = lambda, intercept = TRUE)
+
+lambda<-lsgl::lambda(Xsp,Ysp, alpha=1, lambda.min= 1, intercept = TRUE)
+fit <-lsgl::cv(Xsp,Ysp, alpha=1, lambda = lambda, intercept = TRUE)
+
+lambda<-lsgl::lambda(Xsp, Y1, alpha=1, lambda.min= 1, intercept=FALSE)
+fit <-lsgl::cv(Xsp, Y1, alpha=1, lambda = lambda, intercept=FALSE)
+
+lambda<-lsgl::lambda(Xsp,Ysp, alpha=1, lambda.min= 1, intercept=FALSE)
+fit <-lsgl::cv(Xsp,Ysp, alpha=1, lambda = lambda, intercept=FALSE)
 
 
 ## Test single fit i.e. K = 1
 y <- Y1[,1]
 
-lambda <- lsgl.lambda(X1, y, alpha = 1, d = 25, lambda.min = 0.5, intercept = FALSE)
-fit.cv <- lsgl.cv(X1, y, alpha = 1, lambda = lambda, intercept = FALSE)
+lambda <- lsgl::lambda(X1, y, alpha = 1, d = 25, lambda.min = 0.5, intercept = FALSE)
+fit.cv <- lsgl::cv(X1, y, alpha = 1, lambda = lambda, intercept = FALSE)
+
 
 ## Navigation tests
 Err(fit.cv)
@@ -60,11 +97,17 @@ best_model(fit.cv)
 Xna <- X1
 Xna[1,1] <- NA
 
-res <- try(fit.cv <- lsgl.cv(Xna, Y1, alpha = 1, lambda = lambda, intercept = FALSE), silent = TRUE)
+res <- try(fit.cv <- lsgl::cv(Xna, Y1, alpha = 1, lambda = lambda, intercept = FALSE), silent = TRUE)
 if(class(res) != "try-error") stop()
 
 Yna <- Y1
 Yna[1,1] <- NA
 
-res <- try(fit.cv <- lsgl.cv(X1, Yna, alpha = 1, lambda = lambda, intercept = FALSE), silent = TRUE)
+res <- try(fit.cv <- lsgl::cv(X1, Yna, alpha = 1, lambda = lambda, intercept = FALSE), silent = TRUE)
 if(class(res) != "try-error") stop()
+
+# test deprecated warnings
+
+assertWarning(
+  fit.cv <- lsgl.cv(X1, Y1, alpha=1, lambda = lambda, intercept = TRUE)
+)

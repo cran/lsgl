@@ -1,6 +1,6 @@
 #
 #     Description of this R script:
-#     R tests for linear multiple output sparse group lasso routines.
+#     R test for linear multiple output using sparse group lasso routines.
 #
 #     Intended for use with R.
 #     Copyright (C) 2014 Martin Vincent
@@ -25,37 +25,27 @@ library(methods)
 # warnings = errors
 options(warn=2)
 
-
-set.seed(100) #  ensures consistency of tests
+set.seed(100) # This may be removed, it ensures consistency of the daily tests
 
 ## Simulate from Y=XB+E, the dimension of Y is N x K, X is N x p, B is p x K
 
 N <- 50 #number of samples
-p <- 50 #number of features
-K <- 25  #number of groups
+p <- 25 #number of features
+K <- 10  #number of groups
 
 B<-matrix(sample(c(rep(1,p*K*0.1),rep(0, p*K-as.integer(p*K*0.1)))),nrow=p,ncol=K)
+X1<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
+Y1 <-X1%*%B+matrix(rnorm(N*K,0,1),N,K)
 
-X<-matrix(rnorm(N*p,1,1),nrow=N,ncol=p)
-Y<-X%*%B+matrix(rnorm(N*K,0,1),N,K)
+##Do cross validation
+lambda <- lsgl::lambda(X1, Y1, alpha = 1, d = 25, lambda.min = 0.5, intercept = FALSE)
 
-lambda<-lsgl::lambda(X,Y, alpha=1, lambda.min=.5, intercept=FALSE)
+cl <- makeCluster(2)
+registerDoParallel(cl)
 
-fit <-lsgl::fit(X,Y, alpha=1, lambda = lambda, intercept=FALSE)
+fit.cv <- lsgl::cv(X1, Y1, alpha = 1, lambda = lambda, intercept = FALSE, use_parallel = TRUE)
 
-# print info
-fit
+stopCluster(cl)
 
-# Test features
-features(fit)
-features_stat(fit)
-
-# parameters
-parameters(fit)
-parameters_stat(fit)
-
-nmod(fit)
-
-models(fit)
-
-coef(fit)
+## Cross validation errors (estimated expected generalization error)
+if(min(Err(fit.cv, loss = "SOVE")) > 0.05) stop()
