@@ -177,25 +177,35 @@
 #include <R_ext/Rdynload.h>
 
 static const R_CallMethodDef sglCallMethods[] = {
-		SGL_LAMBDA(lsgl_xd_yd), SGL_LAMBDA(lsgl_xs_yd),
-		SGL_LAMBDA(lsgl_xd_ys), SGL_LAMBDA(lsgl_xs_ys),
-		SGL_LAMBDA(lsgl_w_xd_yd),
-		SGL_FIT(lsgl_xd_yd), SGL_FIT(lsgl_xs_yd),
-		SGL_FIT(lsgl_xd_ys), SGL_FIT(lsgl_xs_ys),
-		SGL_FIT(lsgl_w_xd_yd),
-		SGL_PREDICT(lsgl_xd_yd), SGL_PREDICT(lsgl_xs_yd),
-		SGL_PREDICT(lsgl_xd_ys), SGL_PREDICT(lsgl_xs_ys),
-		SGL_SUBSAMPLING(lsgl_xd_yd), SGL_SUBSAMPLING(lsgl_xs_yd),
-		SGL_SUBSAMPLING(lsgl_xd_ys), SGL_SUBSAMPLING(lsgl_xs_ys),
-		SGL_SUBSAMPLING(lsgl_w_xd_yd),
-		{NULL} };
+
+  SGL_LAMBDA(lsgl_xd_yd), SGL_LAMBDA(lsgl_xs_yd),
+  SGL_LAMBDA(lsgl_xd_ys), SGL_LAMBDA(lsgl_xs_ys),
+  SGL_LAMBDA(lsgl_w_xd_yd),
+
+  SGL_FIT(lsgl_xd_yd), SGL_FIT(lsgl_xs_yd),
+  SGL_FIT(lsgl_xd_ys), SGL_FIT(lsgl_xs_ys),
+  SGL_FIT(lsgl_w_xd_yd),
+
+  SGL_PREDICT(lsgl_xd_yd), SGL_PREDICT(lsgl_xs_yd),
+  SGL_PREDICT(lsgl_xd_ys), SGL_PREDICT(lsgl_xs_ys),
+
+  SGL_SUBSAMPLING(lsgl_xd_yd), SGL_SUBSAMPLING(lsgl_xs_yd),
+  SGL_SUBSAMPLING(lsgl_xd_ys), SGL_SUBSAMPLING(lsgl_xs_ys),
+  SGL_SUBSAMPLING(lsgl_w_xd_yd),
+
+  {"r_pkg_c_config", (DL_FUNC) &r_pkg_c_config, 0},
+
+  {NULL, NULL, 0}
+
+};
 
 extern "C" {
-	void R_init_lsgl(DllInfo *info);
+  void R_init_lsgl(DllInfo *info);
 }
 
 void R_init_lsgl(DllInfo *info)
 {
-	// Register the .Call routines.
-	R_registerRoutines(info, NULL, sglCallMethods, NULL, NULL);
+  // Register the .Call routines.
+  R_registerRoutines(info, NULL, sglCallMethods, NULL, NULL);
+  R_useDynamicSymbols(info, FALSE);
 }

@@ -26,7 +26,7 @@ a vector of errors.
 Compute and return an error for each model. The error may be spicifed in the \code{loss} argument.
 
 The root-mean-square error (RMSE) is
-\deqn{\frac{1}{K}\sum_{i = 1}^K \sqrt{\frac{1}{N}\sum_{j=1}^N Y_{ji}-(X\hat \beta)_{ji}}}
+\deqn{\frac{1}{K}\sum_{i = 1}^K \sqrt{\frac{1}{N}\sum_{j=1}^N (Y_{ji}-(X\hat \beta)_{ji})^2}}
 RMSE is the default error.
 
 The objective value error (OVE) is

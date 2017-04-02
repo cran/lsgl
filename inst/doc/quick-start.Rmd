@@ -61,7 +61,7 @@ cl <- makeCluster(2)
 registerDoParallel(cl)
 
 # Do cross validation -- this may take some time
-fit.cv <- lsgl::cv(X, Y, fold = 10, alpha = 0.5, lambda = 0.001, use_parallel = TRUE)
+fit.cv <- lsgl::cv(X, Y, fold = 10, alpha = 0.5, lambda = 0.01, use_parallel = TRUE)
 
 stopCluster(cl)
 ```
@@ -80,7 +80,7 @@ Hence, the best model is obtained using lambda index `r best_model(fit.cv)` and 
 
 Use lsgl to fit a final model.
 ```{r}
-fit <- lsgl::fit(X, Y, alpha = 0.5, lambda = 0.001)
+fit <- lsgl::fit(X, Y, alpha = 0.5, lambda = 0.01)
 ```
 **Get a summery of the estimated models**
 ```{r}

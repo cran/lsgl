@@ -26,7 +26,7 @@ cl <- makeCluster(2)
 registerDoParallel(cl)
 
 # Do cross validation -- this may take some time
-fit.cv <- lsgl::cv(X, Y, fold = 10, alpha = 0.5, lambda = 0.001, use_parallel = TRUE)
+fit.cv <- lsgl::cv(X, Y, fold = 10, alpha = 0.5, lambda = 0.01, use_parallel = TRUE)
 
 stopCluster(cl)
 
@@ -34,7 +34,7 @@ stopCluster(cl)
 fit.cv
 
 ## ------------------------------------------------------------------------
-fit <- lsgl::fit(X, Y, alpha = 0.5, lambda = 0.001)
+fit <- lsgl::fit(X, Y, alpha = 0.5, lambda = 0.01)
 
 ## ------------------------------------------------------------------------
 fit

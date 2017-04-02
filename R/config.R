@@ -118,7 +118,7 @@ lsgl.standard.config <- lsgl.algorithm.config();
 #' @return list
 #'
 #' @author Martin Vicnet
-#' @useDynLib lsgl r_pkg_c_config
+#' @useDynLib lsgl, .registration=TRUE
 #' @export
 lsgl.c.config <- function() {
 	.Call("r_pkg_c_config")
